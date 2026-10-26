@@ -3217,6 +3217,13 @@ class Handler(BaseHTTPRequestHandler):
                   {'Content-Disposition': f"attachment; filename*=UTF-8''{quote(fname)}"})
 
 
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    # socketserver listens with a backlog of 5; on Linux a burst of new connections past that (a page loading its
+    # files at once, several people syncing) can be reset instead of queued
+    request_queue_size = 128
+
+
 def main():
     init_db()
     if len(sys.argv) == 3 and sys.argv[1] == '--reset-password':  # recovery when no admin can log in
@@ -3246,8 +3253,7 @@ def main():
         save_xunji_key(u['id'], key, kind)
         print('ok')
         return
-    srv = ThreadingHTTPServer((HOST, PORT), Handler)
-    srv.daemon_threads = True
+    srv = Server((HOST, PORT), Handler)
     print(f'lianshiji listening on {HOST}:{PORT}, data in {DATA}, time zone {TZ_NAME}, day starts {DAY_START_HOUR}:00', flush=True)
     srv.serve_forever()
 

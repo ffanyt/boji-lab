@@ -74,8 +74,7 @@ class LiveServer:
             self.srv_mod._later.clear()
         self.srv_mod.LOGIN_FAIL_DELAY = 0          # wrong passwords answer at once in tests
         self.srv_mod.init_db()
-        self.httpd = self.srv_mod.ThreadingHTTPServer(('127.0.0.1', 0), self.srv_mod.Handler)
-        self.httpd.daemon_threads = True
+        self.httpd = self.srv_mod.Server(('127.0.0.1', 0), self.srv_mod.Handler)
         self.port = self.httpd.server_address[1]
         self.base = f'http://127.0.0.1:{self.port}'
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
