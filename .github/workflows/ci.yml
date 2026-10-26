@@ -1,0 +1,31 @@
+name: ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.12"]   # 3.9 = macOS system python3 (bin/lsj, bin/xunji); 3.12 = a current server
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065   # v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m unittest discover -s tests -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065   # v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff==0.17.0
+      - run: ruff check .                  # settings in ruff.toml
+      - run: sh scripts/check-secrets.sh   # secrets and owner-specific data
+      - run: sh -n deploy/deploy.sh && sh -n scripts/check-secrets.sh

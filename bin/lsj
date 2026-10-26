@@ -1,0 +1,1010 @@
+#!/usr/bin/env python3
+"""lsj — command-line client for the 薄肌研究所 server, used by Claude's processing runs.
+
+Config: ~/.config/lianshiji/config.json  {"url": "https://…", "token": "…"}  (LSJ_CONFIG overrides the path)
+Photos are downloaded to ~/.cache/lianshiji/photos/<user id>/.
+
+Every account's data is separate. Commands that touch data take -u <username> (before or after the command);
+it can be left out only while the server has a single account.
+
+  lsj users                           all accounts, with record and pending counts, time zone and day start hour
+  lsj pending                         for every active account: profile, plan, status, records waiting for review (meals,
+                                      workouts, body, progress = 身材照), and what the person left for Claude: messages (留言)
+                                      and inbox decisions to read (both needsReview), memory (meta/memory), autonomy
+                                      (profile/prefs.autonomy: "small" = small plan changes directly, undoable; "ask" = propose
+                                      everything) and persona, how Claude talks to them (profile/prefs.persona: "coach" 正经教练,
+                                      "abstract" 抽象搭子, "roast" 毒舌教练; unset: "coach" when prefs.style is "clean", else "abstract")
+                                      and trainIn, where they log training ("app" = only 薄肌研究所's 训练中, "both" = 训练中 and
+                                      训记, "xunji" = only 训记; unset: "both" when meta/xunji.linked, else "app"). A workout still being logged (status
+                                      "active") is never pending, and day leaves it out. consentAt (profile/prefs.consentAt):
+                                      when they tapped 「我知道了」 under 「你的数据怎么处理」 in the page's welcome; null =
+                                      not yet, so their photos aren't looked at (records without photos are processed)
+  lsj pending -u alice                the same for one account
+  lsj range 2026-10-07 2026-10-13 -u alice     meals, workouts, body, water, sleep, days, health, todos and progress between two dates
+  lsj range 2026-10-07 2026-10-13 --only health,days,workouts -u alice    only those collections
+  lsj day -u alice                    one day as the page sees it: training or rest, targets (with the activity bonus),
+  lsj day 2026-10-13 -u alice         recovery, intake so far, water, sleep, weight, body (bodyFat and girths that have a value),
+                                      feel (晨间状态: energy, sore, stress 1-5), attendance, whether the daily report is stale,
+                                      the person's own todos and the plan values they changed themselves (planCustom)
+                                      (no date: the user's today; their day runs until their day start hour, 05:00 by default)
+  lsj list meals -w needsReview:eq:true --order date --desc --limit 50
+  lsj get plan current
+  lsj set reports daily-2026-10-13 '{"kind": "daily", …}'      (JSON inline, a file path, or - for stdin)
+  lsj update meals m123 review.json --if-version 3
+  lsj delete reports old-id --if-version 1
+  lsj batch writes.json               [{"op": "update", "collection": "meals", "id": "m1", "data": {…}, "ifVersion": 3}, …]
+                                      or {"user": "alice", "ops": [...]}: refused unless "user" is the -u account
+  lsj photos meals m123               download a record's photos, print local paths (a meal's leftover photos print as "剩菜 <path>")
+  lsj photos progress 2026-10-16      身材照: one line per photo, "正面 <path>", "侧面 <path>", "背面 <path>"
+  lsj photo <photo id>
+  lsj notify -u alice --kind report --title '日报写好了' --body '蛋白质还差 40 g，睡前补一杯奶' [--url '/#claude']
+                                      a push notification to the person's devices (kind: report, proposal, reply, remind;
+                                      title ≤ 40, body ≤ 120 characters, url a path on the site). Skipped when they turned that
+                                      kind off; with no device subscribed it prints "subs": 0 and exits 0
+
+LSJ_DENY_COLLECTIONS=plan,profile   refuse every write (set, update, delete, batch op) to these collections (exit 1).
+
+Exit codes:
+  0  ok
+  1  usage or config error (bad arguments, unreadable JSON, unknown user, batch for another user, denied collection,
+     token rejected)
+  2  server or network error (unreachable, timeout, HTTP 5xx/4xx other than below)
+  3  version conflict: the record changed since it was read — re-read it and redo the write
+  4  not found (get, photos, update … on a record that does not exist)
+"""
+import argparse
+import datetime as dt
+import http.client
+import json
+import math
+import os
+import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+CONFIG = os.environ.get('LSJ_CONFIG') or os.path.expanduser('~/.config/lianshiji/config.json')
+PHOTO_DIR = os.path.expanduser('~/.cache/lianshiji/photos')
+EXT = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif'}
+RANGE_COLLECTIONS = ('meals', 'workouts', 'body', 'water', 'sleep', 'days', 'health', 'todos', 'progress')
+NEWER_COLLECTIONS = ('progress',)  # an older server doesn't have these yet: read as empty
+PUSH_KINDS = ('report', 'proposal', 'reply', 'remind')
+PROGRESS_VIEWS = (('front', '正面'), ('side', '侧面'), ('back', '背面'))
+WRITE_OPS = ('set', 'update', 'merge', 'delete')
+DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+DAY_START_HOUR = 5  # a day runs until 05:00 unless the server lists the account with its own dayStartHour
+
+EXIT_USAGE, EXIT_SERVER, EXIT_CONFLICT, EXIT_NOT_FOUND = 1, 2, 3, 4
+
+
+class LsjError(Exception):
+    """A failure with the exit code the CLI should end with."""
+
+    def __init__(self, message, code=EXIT_SERVER, status=None):
+        super().__init__(message)
+        self.code, self.status = code, status
+
+
+def die(msg, code=EXIT_USAGE):
+    print(msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def out(obj):
+    print(json.dumps(obj, ensure_ascii=False, indent=1))
+
+
+def _no_nan(name):
+    raise ValueError(f'{name} is not allowed')
+
+
+def parse_json(text, what='JSON'):
+    """json.loads that rejects NaN/Infinity, raising LsjError(1)."""
+    try:
+        return json.loads(text, parse_constant=_no_nan)
+    except ValueError as e:
+        raise LsjError(f'invalid {what}: {e}', EXIT_USAGE)
+
+
+def dumps_strict(obj):
+    try:
+        return json.dumps(obj, ensure_ascii=False, allow_nan=False).encode()
+    except ValueError as e:
+        raise LsjError(f'cannot send this JSON: {e}', EXIT_USAGE)
+
+
+def denied_collections(env=None):
+    raw = (os.environ if env is None else env).get('LSJ_DENY_COLLECTIONS') or ''
+    return {c.strip() for c in raw.split(',') if c.strip()}
+
+
+def load_config(path=None):
+    path = path or os.environ.get('LSJ_CONFIG') or CONFIG
+    try:
+        with open(path, encoding='utf-8') as f:
+            c = json.load(f)
+        return c['url'].rstrip('/'), c['token']
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+        raise LsjError(f'cannot read {path}: {e.__class__.__name__}', EXIT_USAGE)
+
+
+# ---------------------------------------------------------------- client
+
+class Client:
+    """The 薄肌研究所 API as the service token sees it. Bound to one account with for_user()."""
+
+    def __init__(self, url, token, user=None, timeout=60, deny=None):
+        self.url, self.token, self.user, self.timeout = url.rstrip('/'), token, user, timeout
+        self.deny = denied_collections() if deny is None else set(deny)
+        host = urllib.parse.urlsplit(self.url).hostname or ''
+        # the Mac's HTTP proxy is fine for the real server, but must not see local test servers
+        handlers = [urllib.request.ProxyHandler({})] if host in ('127.0.0.1', 'localhost', '::1') else []
+        self._opener = urllib.request.build_opener(*handlers)
+        self._users = None
+
+    @classmethod
+    def from_config(cls, path=None, **kw):
+        url, token = load_config(path)
+        return cls(url, token, **kw)
+
+    def request(self, method, path, body=None, headers=None, raw=False):
+        h = {'Authorization': 'Bearer ' + self.token}
+        if self.user:
+            h['X-LSJ-User'] = self.user['id']
+        data = None
+        if body is not None:
+            data = dumps_strict(body)
+            h['Content-Type'] = 'application/json'
+        h.update(headers or {})
+        req = urllib.request.Request(self.url + path, data=data, method=method, headers=h)
+        try:
+            with self._opener.open(req, timeout=self.timeout) as r:
+                payload, ctype = r.read(), r.headers.get('Content-Type', '')
+        except urllib.error.HTTPError as e:
+            try:
+                detail = e.read().decode(errors='replace')
+            except (OSError, http.client.HTTPException):
+                detail = ''
+            try:
+                detail = json.loads(detail)['error']['message'] or detail
+            except (ValueError, KeyError, TypeError):
+                pass
+            if e.code == 401:
+                raise LsjError(f'HTTP 401 {method} {path}: {detail} (check the token in the config)', EXIT_USAGE, 401)
+            code = {409: EXIT_CONFLICT, 404: EXIT_NOT_FOUND}.get(e.code, EXIT_SERVER)
+            raise LsjError(f'HTTP {e.code} {method} {path}: {detail}', code, e.code)
+        except (urllib.error.URLError, http.client.HTTPException, OSError) as e:  # includes timeouts and resets
+            reason = getattr(e, 'reason', None) or e.__class__.__name__ + (f': {e}' if str(e) else '')
+            raise LsjError(f'cannot reach {self.url} ({method} {path}): {reason}', EXIT_SERVER)
+        if raw:
+            return payload, ctype
+        try:
+            return json.loads(payload)
+        except ValueError:
+            raise LsjError(f'{method} {path}: the server did not answer with JSON', EXIT_SERVER)
+
+    # ---- accounts
+    def users(self):
+        if self._users is None:
+            self._users = self.request('GET', '/api/admin/users')['users']
+        return self._users
+
+    def find_user(self, name):
+        """The account for a username or id; None when there is none."""
+        return next((x for x in self.users() if name in (x['username'], x['id'])), None)
+
+    def pick_user(self, name=None):
+        everyone = self.users()
+        if name:
+            u = self.find_user(name)
+            if not u:
+                raise LsjError(f'no user {name}; users: ' + ', '.join(x['username'] for x in everyone), EXIT_USAGE)
+            return u
+        if len(everyone) == 1:
+            return everyone[0]
+        raise LsjError('several accounts exist, pass -u <username>: ' + ', '.join(x['username'] for x in everyone), EXIT_USAGE)
+
+    def for_user(self, user=None):
+        """A client acting for one account (a username, an id, a user dict, or None when there is one account)."""
+        u = user if isinstance(user, dict) else self.pick_user(user)
+        c = Client(self.url, self.token, u, self.timeout, self.deny)
+        c._opener, c._users = self._opener, self._users
+        return c
+
+    # ---- documents
+    @staticmethod
+    def doc_path(col, doc_id):
+        return f'/api/d/{urllib.parse.quote(col, safe="")}/{urllib.parse.quote(doc_id, safe="")}'
+
+    def get(self, col, doc_id):
+        """The record, or None when it does not exist."""
+        try:
+            return self.request('GET', self.doc_path(col, doc_id))
+        except LsjError as e:
+            if e.status == 404:
+                return None
+            raise
+
+    def list(self, col, where=(), order=None, desc=False, limit=1000):
+        q = [('where', w) for w in where]
+        if order:
+            q += [('order', order), ('dir', 'desc' if desc else 'asc')]
+        q.append(('limit', str(limit)))
+        return self.request('GET', f'/api/c/{urllib.parse.quote(col, safe="")}?' + urllib.parse.urlencode(q))['docs']
+
+    def range(self, start, end, only=None):
+        w = [f'date:gte:{json.dumps(start)}', f'date:lte:{json.dumps(end)}']
+        out = {}
+        for c in only or RANGE_COLLECTIONS:
+            try:
+                out[c] = self.list(c, w, 'date', limit=5000)
+            except LsjError as e:
+                if e.status != 404 or c not in NEWER_COLLECTIONS:
+                    raise
+                out[c] = []
+        return out
+
+    def check_writable(self, col):
+        if col in self.deny:
+            raise LsjError(f'writes to "{col}" are blocked (LSJ_DENY_COLLECTIONS={",".join(sorted(self.deny))})', EXIT_USAGE)
+
+    def write(self, op, col, doc_id, data=None, if_version=None):
+        """op: set (replace), update (deep merge into an existing record) or delete."""
+        method = {'set': 'PUT', 'update': 'PATCH', 'delete': 'DELETE'}.get(op)
+        if not method:
+            raise LsjError(f'unknown write {op}', EXIT_USAGE)
+        self.check_writable(col)
+        if op != 'delete' and not isinstance(data, dict):
+            raise LsjError('the record must be a JSON object', EXIT_USAGE)
+        headers = {'If-Match': str(if_version)} if if_version is not None else None
+        return self.request(method, self.doc_path(col, doc_id), data if op != 'delete' else None, headers)
+
+    def batch(self, ops):
+        """Several writes in one transaction: all of them happen or none does."""
+        check_ops(ops)
+        for o in ops:
+            self.check_writable(o['collection'])
+        return self.request('POST', '/api/batch', ops)['results']
+
+    def notify(self, kind, title, body='', url='/'):
+        """A push notification to this account's devices: {queued, sent, failed, subs, results, skipped?}."""
+        return self.request('POST', '/api/push/send', {'kind': kind, 'title': title, 'body': body, 'url': url})
+
+    # ---- photos
+    def photo(self, pid):
+        if not re.match(r'^[0-9a-f]{32}$', str(pid)):
+            raise LsjError(f'bad photo id {pid!r}', EXIT_USAGE)
+        d = os.path.join(PHOTO_DIR, self.user['id'])
+        os.makedirs(d, exist_ok=True)
+        for ext in EXT.values():
+            p = os.path.join(d, f'{pid}.{ext}')
+            if os.path.exists(p):
+                return p
+        body, ctype = self.request('GET', f'/api/photos/{pid}', raw=True)
+        p = os.path.join(d, f'{pid}.{EXT.get(ctype.split(";")[0], "jpg")}')
+        tmp = p + f'.{os.getpid()}.part'
+        with open(tmp, 'wb') as f:
+            f.write(body)
+        os.replace(tmp, p)
+        return p
+
+
+def check_notice(title, body, url):
+    """The limits the server enforces on a push notification, checked first so a bad one is a usage error (exit 1)."""
+    if not title.strip() or len(' '.join(title.split())) > 40:
+        raise LsjError('--title: 1-40 characters', EXIT_USAGE)
+    if len(' '.join(body.split())) > 120:
+        raise LsjError('--body: at most 120 characters', EXIT_USAGE)
+    if not re.fullmatch(r'/(?![/\\])[^\s\\]*', url) or len(url) > 200:
+        raise LsjError('--url: a path on the site starting with /, e.g. /#claude', EXIT_USAGE)
+
+
+def check_ops(ops):
+    if not isinstance(ops, list) or not ops:
+        raise LsjError('a batch is a non-empty list of writes', EXIT_USAGE)
+    for i, o in enumerate(ops):
+        if not isinstance(o, dict) or o.get('op') not in WRITE_OPS or not isinstance(o.get('collection'), str) \
+                or not isinstance(o.get('id'), str):
+            raise LsjError(f'batch item {i}: needs "op" ({"/".join(WRITE_OPS)}), "collection" and "id"', EXIT_USAGE)
+        if o['op'] != 'delete' and not isinstance(o.get('data'), dict):
+            raise LsjError(f'batch item {i}: "data" must be a JSON object', EXIT_USAGE)
+
+
+def unwrap_batch(payload):
+    """(user named by the batch or None, ops). A batch is a list of ops, or {"user": "<username>", "ops": [...]}."""
+    if isinstance(payload, list):
+        return None, payload
+    if isinstance(payload, dict) and 'ops' in payload:
+        u = payload.get('user')
+        if not isinstance(u, str) or not u.strip():
+            raise LsjError('a batch wrapper needs "user": "<username>"', EXIT_USAGE)
+        if not isinstance(payload['ops'], list):
+            raise LsjError('"ops" must be a list of writes', EXIT_USAGE)
+        return u.strip(), payload['ops']
+    raise LsjError('a batch is a list of writes or {"user": "<username>", "ops": [...]}', EXIT_USAGE)
+
+
+def read_json(arg, stdin=None):
+    """JSON given inline, as a file path, or on stdin (- or nothing)."""
+    stdin = stdin or sys.stdin
+    if arg is None or arg == '-':
+        if arg is None and stdin.isatty():
+            raise LsjError('pass the JSON inline, as a file path, or pipe it in with -', EXIT_USAGE)
+        text = stdin.read()
+    elif arg.lstrip().startswith(('{', '[')):
+        text = arg
+    else:
+        try:
+            with open(arg, encoding='utf-8') as f:
+                text = f.read()
+        except OSError as e:
+            raise LsjError(f'cannot read {arg}: {e.strerror or e}', EXIT_USAGE)
+    return parse_json(text)
+
+
+AUTONOMY = ('small', 'ask')  # profile/prefs.autonomy; "small" when unset
+PERSONAS = ('coach', 'abstract', 'roast')  # profile/prefs.persona: 正经教练, 抽象搭子, 毒舌教练
+
+
+TRAIN_IN = ('app', 'both', 'xunji')  # profile/prefs.trainIn: where this person logs training
+
+
+def train_in(prefs, xunji_meta):
+    """Where this person logs training: prefs.trainIn (app / both / xunji); unset, \"both\" when their 训记 is linked,
+    otherwise \"app\"."""
+    t = prefs.get('trainIn')
+    if t in TRAIN_IN:
+        return t
+    return 'both' if (xunji_meta or {}).get('linked') else 'app'
+
+
+def done_only(docs):
+    """Workouts without the one being logged right now (status \"active\": the page's 训练中, saved as it goes)."""
+    return [x for x in docs or [] if (x.get('data') or {}).get('status') != 'active']
+
+
+def persona_of(prefs):
+    """How Claude talks to this person: prefs.persona; unset, it follows the page style (prefs.style "clean" → "coach",
+    otherwise, "abstract" included, → "abstract")."""
+    p = prefs.get('persona')
+    if p in PERSONAS:
+        return p
+    return 'coach' if prefs.get('style') == 'clean' else 'abstract'
+
+
+def waiting(client, col, order):
+    """Records of col with needsReview, oldest first; [] from a server that doesn't have that collection yet."""
+    try:
+        return client.list(col, ['needsReview:eq:true'], order)
+    except LsjError as e:
+        if e.status == 404:
+            return []
+        raise
+
+
+def pending_for(client):
+    u = client.user
+    prefs = (client.get('profile', 'prefs') or {}).get('data') or {}
+    return {
+        'user': {**{k: u[k] for k in ('id', 'username', 'name', 'role')}, **{k: u[k] for k in ('dayStartHour', 'tz') if k in u}},
+        'profile': client.get('profile', 'main'),
+        'plan': client.get('plan', 'current'),
+        'status': client.get('meta', 'status'),
+        'meals': client.list('meals', ['needsReview:eq:true'], 'date'),
+        'workouts': done_only(client.list('workouts', ['needsReview:eq:true'], 'date')),
+        'body': client.list('body', ['needsReview:eq:true'], 'date'),  # sleep screenshots to read
+        'progress': waiting(client, 'progress', 'date'),               # new 身材照 to compare with the last ones
+        'messages': waiting(client, 'messages', 'createdAt'),          # what the person asked Claude to do
+        'inbox': waiting(client, 'inbox', 'createdAt'),                # proposals and questions the person decided on
+        'memory': (client.get('meta', 'memory') or {}).get('data'),    # what Claude remembers about them (they can edit it)
+        'autonomy': prefs.get('autonomy') if prefs.get('autonomy') in AUTONOMY else 'small',
+        'persona': persona_of(prefs),
+        'trainIn': train_in(prefs, (client.get('meta', 'xunji') or {}).get('data')),
+        'consentAt': prefs.get('consentAt') if isinstance(prefs.get('consentAt'), str) and prefs['consentAt'] else None,
+    }
+
+
+# ---------------------------------------------------------------- one day, computed exactly as the page does
+# Pure functions: they take the records (as the server returns them) and compute; tests import them.
+
+MACROS = ('kcal', 'protein', 'carbs', 'fat')
+DRINK_PER_100ML = {  # drinks in water/<date> that carry energy
+    'milk': {'kcal': 65, 'protein': 3.2, 'carbs': 4.8, 'fat': 3.6},   # whole milk
+    'soy': {'kcal': 31, 'protein': 3.0, 'carbs': 1.2, 'fat': 1.6},    # unsweetened soy milk
+}
+DAY_COLLECTIONS = ('meals', 'workouts', 'body', 'water', 'sleep', 'health', 'days', 'progress')  # progress: 身材照
+BODY_KEYS = ('bodyFat', 'waist', 'arm', 'chest', 'hip', 'thigh')   # body/<date>: body fat % and girths in cm
+FEEL_KEYS = ('energy', 'sore', 'stress', 'at')                      # body/<date>.feel: 晨间状态
+HEALTH_KEYS = ('steps', 'activeKcal', 'restingHR', 'hrv')
+SLOTS = ('breakfast', 'lunch', 'snack', 'dinner', 'late')   # the page's order; late = 夜宵
+SLOT_TIME = {'breakfast': '08:00', 'lunch': '12:00', 'snack': '15:30', 'dinner': '18:30', 'late': '23:00'}  # for meals without a time
+
+
+def is_num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def js_round(x):
+    """Math.round: halves round up (Python's round() rounds half to even)."""
+    return int(math.floor(x + 0.5))
+
+
+def tidy(x, places=1):
+    """A number for output: ints stay ints, floats get at most `places` decimals."""
+    if not is_num(x):
+        return None
+    if places == 0:
+        return js_round(x)
+    f = 10 ** places
+    v = js_round(x * f) / f
+    return int(v) if v == int(v) else v
+
+
+def median(xs):
+    a = sorted(xs)
+    n = len(a)
+    if not n:
+        return None
+    return a[(n - 1) // 2] if n % 2 else (a[n // 2 - 1] + a[n // 2]) / 2
+
+
+def zone(name):
+    """A tzinfo for the server's time zone name; None (this computer's zone) when it is missing or unknown here."""
+    if not name:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(name)
+    except Exception:  # ImportError, ZoneInfoNotFoundError, ValueError
+        return None
+
+
+def day_start_of(user):
+    """The account's day start hour as the server lists it (users: dayStartHour); DAY_START_HOUR from an older server."""
+    h = (user or {}).get('dayStartHour')
+    return h if isinstance(h, int) and not isinstance(h, bool) and 0 <= h <= 23 else DAY_START_HOUR
+
+
+def user_today(now=None, start=None, tz=None):
+    """The user's date: until their day start hour (default 05:00) it is still the day before. tz: the server's zone
+    name (users: tz); None uses this computer's zone."""
+    now = now or dt.datetime.now(zone(tz))
+    return (now - dt.timedelta(hours=DAY_START_HOUR if start is None else start)).date().isoformat()
+
+
+def add_days(d, n):
+    return (dt.date.fromisoformat(d) + dt.timedelta(days=n)).isoformat()
+
+
+def iso_weekday(d):
+    return dt.date.fromisoformat(d).isoweekday()
+
+
+def _sort_key(env):
+    """Order of records within a day: when they happened (训记 start, else created), then id."""
+    data = env.get('data') or {}
+    start = (data.get('xunji') or {}).get('start')
+    if is_num(start):
+        stamp = dt.datetime.fromtimestamp(start / 1000, dt.timezone.utc).isoformat()
+    else:
+        stamp = str(data.get('createdAt') or env.get('updatedAt') or '')
+    return stamp, env.get('id') or ''
+
+
+class DayData:
+    """Records indexed by date: {collection: {date: [record, …]}}."""
+
+    def __init__(self, *sources):
+        self.by, seen = {}, set()
+        for src in sources:
+            for col, docs in (src or {}).items():
+                for env in docs or []:
+                    key = (col, env.get('id'))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    data = env.get('data') or {}
+                    date = data.get('date') or (env.get('id') if DATE_RE.match(str(env.get('id'))) else None)
+                    if isinstance(date, str) and DATE_RE.match(date):
+                        self.by.setdefault(col, {}).setdefault(date, []).append(env)
+        for days in self.by.values():
+            for lst in days.values():
+                lst.sort(key=_sort_key)
+
+    def docs(self, col, date):
+        return self.by.get(col, {}).get(date, [])
+
+    def one(self, col, date):
+        """The data of the one-per-day record (body, water, sleep, health, days), or {}."""
+        lst = self.docs(col, date)
+        env = next((e for e in lst if e.get('id') == date), lst[0] if lst else None)
+        return (env or {}).get('data') or {}
+
+    def dates(self, col):
+        return sorted(self.by.get(col, {}))
+
+
+def _training(plan):
+    return ((plan or {}).get('training') or {}) if isinstance((plan or {}).get('training'), dict) else {}
+
+
+def _rotation(plan):
+    rot = _training(plan).get('rotation')
+    return [str(x) for x in rot if x] if isinstance(rot, list) else []
+
+
+def _schedule(plan):
+    s = _training(plan).get('schedule')
+    return s if isinstance(s, dict) else {}
+
+
+def trained_on(date, dd):
+    """(trained?, plan day id) for one date: a non-rest days pick wins, else the latest workout's planDayId."""
+    pick = dd.one('days', date).get('plan')
+    if isinstance(pick, str) and pick and pick != 'rest':
+        return True, pick
+    wos = dd.docs('workouts', date)
+    if wos:
+        return True, next((w['data'].get('planDayId') for w in reversed(wos) if w['data'].get('planDayId')), None)
+    return False, None
+
+
+def last_rotation_day(d, dd, rotation):
+    """(date, plan day id) of the latest date before d trained on a rotation day, or (None, None).
+    A days pick in the rotation wins over that date's workouts; among workouts the latest one with a rotation id counts."""
+    dates = sorted({x for col in ('workouts', 'days') for x in dd.dates(col) if x < d}, reverse=True)
+    for x in dates:
+        pick = dd.one('days', x).get('plan')
+        if pick in rotation:
+            return x, pick
+        for w in reversed(dd.docs('workouts', x)):
+            if w['data'].get('planDayId') in rotation:
+                return x, w['data']['planDayId']
+    return None, None
+
+
+def day_kind(d, dd, plan, today):
+    """What d is. Rules in order (reason names the one that decided):
+    days: days/<d>.plan ("rest" → rest, an id → that plan day)
+    workout: a workout dated d → its planDayId (the first one that has one), else training without a plan day
+    past: d is before today → rest
+    schedule / rotation: plan.training.schedule[ISO weekday] → that day id; with plan.training.rotation (and d today or
+      later) the id is instead the next one in the rotation after the last day trained before d
+    default: rest"""
+    pick = dd.one('days', d).get('plan')
+    if pick == 'rest':
+        return {'kind': 'rest', 'planDayId': None, 'reason': 'days'}
+    if isinstance(pick, str) and pick:
+        return {'kind': 'training', 'planDayId': pick, 'reason': 'days'}
+    wos = dd.docs('workouts', d)
+    if wos:
+        pid = next((w['data'].get('planDayId') for w in wos if w['data'].get('planDayId')), None)
+        return {'kind': 'training', 'planDayId': pid, 'reason': 'workout'}
+    if d < today:
+        return {'kind': 'rest', 'planDayId': None, 'reason': 'past'}
+    sid = _schedule(plan).get(str(iso_weekday(d)))
+    if sid:
+        rotation = _rotation(plan)
+        if rotation:
+            last_date, last_id = last_rotation_day(d, dd, rotation)
+            nid = rotation[(rotation.index(last_id) + 1) % len(rotation)] if last_date else str(sid)
+            return {'kind': 'training', 'planDayId': nid, 'reason': 'rotation',
+                    'rotation': {'lastDate': last_date, 'lastPlanDayId': last_id, 'scheduled': sid}}
+        return {'kind': 'training', 'planDayId': sid, 'reason': 'schedule'}
+    return {'kind': 'rest', 'planDayId': None, 'reason': 'default'}
+
+
+def diet_targets(plan, kind):
+    """plan.diet for a training day; on a rest day overlaid with plan.diet.restDay."""
+    diet = (plan or {}).get('diet') if isinstance((plan or {}).get('diet'), dict) else {}
+    t = {k: diet.get(k) if is_num(diet.get(k)) else None for k in MACROS}
+    rest = diet.get('restDay')
+    if kind == 'rest' and isinstance(rest, dict):
+        t.update({k: rest[k] for k in MACROS if is_num(rest.get(k))})
+    return t
+
+
+def latest_weight(d, dd, profile):
+    for x in reversed(dd.dates('body')):
+        if x <= d and is_num(dd.one('body', x).get('weight')):
+            return dd.one('body', x)['weight']
+    w = (profile or {}).get('weight')
+    return w if is_num(w) else None
+
+
+def water_target(d, dd, plan, profile):
+    """Same as the page: plan.diet.water, else 35 ml × the latest known weight rounded to 100 ml and kept within
+    1500–3500, else 2000."""
+    w = ((plan or {}).get('diet') or {}).get('water')
+    if is_num(w):
+        return w
+    kg = latest_weight(d, dd, profile)
+    return min(3500, max(1500, js_round(kg * 35 / 100) * 100)) if kg is not None else 2000
+
+
+def health_of(d, dd):
+    """health/<d> without the metrics the person marked 「这天不算」 (health.ignore): those count as missing everywhere."""
+    h = dd.one('health', d)
+    ign = h.get('ignore')
+    return {k: v for k, v in h.items() if k not in ign} if isinstance(ign, list) and ign else h
+
+
+def activity_bonus(d, dd, plan, today, kind=None):
+    """Extra kcal for a clearly more active day than this person's usual day of the same kind (training/rest).
+    Baseline: activeKcal on same-kind days in the 28 days before d, leaving out days with activeKcal < 100 or
+    steps < 1000 (likely not wearing the Watch); needs 4 such days. extra ≥ 150 → bonus = min(600, extra × 0.75)
+    rounded to 10."""
+    kind = kind or day_kind(d, dd, plan, today)['kind']
+    vals = []
+    for i in range(1, 29):
+        x = add_days(d, -i)
+        h = health_of(x, dd)
+        a, steps = h.get('activeKcal'), h.get('steps')
+        if not is_num(a) or a < 100 or (is_num(steps) and steps < 1000):
+            continue
+        if day_kind(x, dd, plan, today)['kind'] != kind:
+            continue
+        vals.append(a)
+    a = health_of(d, dd).get('activeKcal')
+    base = median(vals) if len(vals) >= 4 else None
+    res = {'activeKcal': a if is_num(a) else None, 'baseline': tidy(base), 'baselineDays': len(vals), 'extra': None, 'bonus': 0}
+    if is_num(a) and base is not None:
+        extra = a - base
+        res['extra'] = tidy(extra)
+        if extra >= 150:
+            res['bonus'] = js_round(min(600, extra * 0.75) / 10) * 10
+    return res
+
+
+def _health_baseline(dd, key, d):
+    vals = [health_of(add_days(d, -i), dd).get(key) for i in range(1, 29)]
+    vals = [v for v in vals if is_num(v)]
+    return (median(vals) if len(vals) >= 14 else None), len(vals)
+
+
+def recovery_flags(d, dd):
+    """RHR flag: restingHR(d) − median of the 28 days before ≥ 5. HRV flag: mean of the hrv values present on d, d−1, d−2
+    ≤ 0.85 × median of the 28 days before d. A baseline needs 14 days with a value. Ignored metrics (health.ignore) are missing."""
+    rhr = health_of(d, dd).get('restingHR')
+    rhr_base, rhr_n = _health_baseline(dd, 'restingHR', d)
+    hrv = health_of(d, dd).get('hrv')
+    hrv3 = [v for v in (health_of(add_days(d, -i), dd).get('hrv') for i in range(3)) if is_num(v)]
+    mean3 = sum(hrv3) / len(hrv3) if hrv3 else None
+    hrv_base, hrv_n = _health_baseline(dd, 'hrv', d)
+    return {
+        'rhr': {'value': rhr if is_num(rhr) else None, 'baseline': tidy(rhr_base), 'baselineDays': rhr_n,
+                'flag': bool(is_num(rhr) and rhr_base is not None and rhr - rhr_base >= 5)},
+        'hrv': {'value': hrv if is_num(hrv) else None, 'mean3': tidy(mean3), 'baseline': tidy(hrv_base), 'baselineDays': hrv_n,
+                'flag': bool(mean3 is not None and hrv_base is not None and mean3 <= 0.85 * hrv_base)},
+    }
+
+
+def recovery(d, dd):
+    """recoveryLow only when the same flag (RHR or HRV) holds on both d and d−1."""
+    cur, prev = recovery_flags(d, dd), recovery_flags(add_days(d, -1), dd)
+    low = any(cur[k]['flag'] and prev[k]['flag'] for k in ('rhr', 'hrv'))
+    return {'recoveryLow': low, 'rhr': {**cur['rhr'], 'prev': prev['rhr']}, 'hrv': {**cur['hrv'], 'prev': prev['hrv']}}
+
+
+def meal_order(m, day_start=DAY_START_HOUR):
+    """Sort key within a day, as the page orders meals: the time eaten, times before the day start counted after 23:59."""
+    t = m.get('time')
+    if not (isinstance(t, str) and re.match(r'^\d{1,2}:\d{2}$', t)):
+        t = SLOT_TIME.get(m.get('slot'), '12:00')
+    h, mi = (int(x) for x in t.split(':'))
+    return (h + 24 if h < day_start else h) * 60 + mi, SLOTS.index(m['slot']) if m.get('slot') in SLOTS else len(SLOTS)
+
+
+def meal_numbers(m):
+    """(numbers, source) for one meal, as the page counts it. A meal is eaten and counted when manual.kcal, review.kcal
+    or quick items exist (source: manual, review or quick, by where kcal comes from); otherwise it waits for Claude
+    (source None, all 0). Field by field: the person's own manual[f], else Claude's review[f], else the quick items' sum."""
+    manual = m.get('manual') if isinstance(m.get('manual'), dict) else {}
+    review = m.get('review') if isinstance(m.get('review'), dict) else {}
+    quick = [x for x in m['quick'] if isinstance(x, dict)] if isinstance(m.get('quick'), list) else []
+    src = 'manual' if is_num(manual.get('kcal')) else 'review' if is_num(review.get('kcal')) else 'quick' if quick else None
+    if not src:
+        return {k: 0 for k in MACROS}, None
+    return {k: manual[k] if is_num(manual.get(k)) else review[k] if is_num(review.get(k))
+            else sum(x[k] for x in quick if is_num(x.get(k))) for k in MACROS}, src
+
+
+def macros_out(x):
+    return {k: tidy(x[k], 0 if k == 'kcal' else 1) for k in MACROS}
+
+
+def intake(d, dd, day_start=DAY_START_HOUR):
+    """What was eaten and drunk on d: every meal by the intake rule (meal_numbers), plus milk / soy milk from water/<d>.
+    manual / quick: the meals whose kcal the person typed or logged from the quick list, and what they add up to;
+    mealsReviewed: meals counted with Claude's kcal. meals: d's meals in the page's order (late = 夜宵 comes last),
+    source None = not counted yet; pending: meals waiting for Claude (needsReview), counted = already in the totals."""
+    by = {s: {k: 0 for k in MACROS} for s in ('manual', 'review', 'quick')}
+    n = {s: 0 for s in by}
+    meals, pending = [], []
+    for env in sorted(dd.docs('meals', d), key=lambda e: meal_order(e.get('data') or {}, day_start)):
+        m = env.get('data') or {}
+        nums, src = meal_numbers(m)
+        if src:
+            n[src] += 1
+            for k in MACROS:
+                by[src][k] += nums[k]
+        row = {'id': env.get('id'), 'slot': m.get('slot'), 'time': m.get('time')}
+        meals.append({**row, **macros_out(nums), 'source': src, 'needsReview': bool(m.get('needsReview'))})
+        if m.get('needsReview'):
+            pending.append({**row, 'reviewed': isinstance(m.get('review'), dict), 'counted': bool(src)})
+    drinks = {k: 0 for k in MACROS}
+    for e in dd.one('water', d).get('entries') or []:
+        per = DRINK_PER_100ML.get((e or {}).get('kind'))
+        if per and is_num(e.get('ml')) and e['ml'] > 0:
+            for k in MACROS:
+                drinks[k] += per[k] * e['ml'] / 100
+    total = {k: sum(by[s][k] for s in by) + drinks[k] for k in MACROS}
+    return {**macros_out(total), 'mealsReviewed': n['review'], 'drinks': macros_out(drinks),
+            'quick': {**macros_out(by['quick']), 'meals': n['quick']}, 'manual': {**macros_out(by['manual']), 'meals': n['manual']},
+            'meals': meals, 'pending': pending}
+
+
+def water_total(d, dd):
+    w = dd.one('water', d)
+    if is_num(w.get('total')):
+        return w['total']
+    return sum(e['ml'] for e in w.get('entries') or [] if is_num((e or {}).get('ml')))
+
+
+def sleep_summary(d, dd):
+    """The night that ended on d: sleep/<d> (Apple Health, a screenshot, or the person's own edit: source manual), else
+    body.sleep hours. A night the person cleared on the page (cleared: true) is no sleep data."""
+    s = dd.one('sleep', d)
+    if s.get('cleared'):
+        return None
+    if s:
+        return {k: s.get(k) for k in ('source', 'asleep', 'deep', 'core', 'rem', 'awake', 'inBed', 'bedtime', 'wake') if s.get(k) is not None}
+    b = dd.one('body', d)
+    if is_num(b.get('sleep')):
+        return {'source': b.get('sleepSource') or 'body', 'asleep': js_round(b['sleep'] * 60)}
+    return None
+
+
+def week_start(d):
+    return add_days(d, 1 - iso_weekday(d))
+
+
+def attendance(d, dd, plan):
+    """This week (Mon–Sun) so far and the last trained day on or before d.
+    A trained date has a workout or a days pick that is not rest."""
+    mon = week_start(d)
+    dates = {x for col in ('workouts', 'days') for x in dd.dates(col)}
+    trained = sorted(x for x in dates if trained_on(x, dd)[0])
+    week = [x for x in trained if mon <= x <= add_days(mon, 6)]
+    last = next((x for x in reversed(trained) if x <= d), None)
+    return {
+        'weekDone': len(week),
+        'weekTarget': sum(1 for v in _schedule(plan).values() if v),
+        'daysSinceLast': (dt.date.fromisoformat(d) - dt.date.fromisoformat(last)).days if last else None,
+        'lastDate': last,
+        'lastPlanDayId': trained_on(last, dd)[1] if last else None,
+    }
+
+
+def report_stale(d, dd, report):
+    """True when reports/daily-<d> is missing or older than the newest change to that day's records."""
+    stamps = [env.get('updatedAt') or '' for col in DAY_COLLECTIONS for env in dd.docs(col, d)]
+    if not report:
+        return True
+    return bool(stamps) and (report.get('updatedAt') or '') < max(stamps)
+
+
+def day_summary(d, today, rng, plan=None, profile=None, report=None, history=None, todos=None, day_start=DAY_START_HOUR):
+    """Everything about one day. rng: {collection: [records]} for at least d−30 … d (lsj range);
+    history: older workouts/days records to find the last trained day (optional); todos: the data of todos/<d>."""
+    dd = DayData(rng, history)
+    kind = day_kind(d, dd, plan, today)
+    targets = diet_targets(plan, kind['kind'])
+    act = activity_bonus(d, dd, plan, today, kind['kind'])
+    if act['bonus']:
+        if is_num(targets['kcal']):
+            targets['kcal'] += act['bonus']
+        if is_num(targets['carbs']):
+            targets['carbs'] = tidy(targets['carbs'] + act['bonus'] / 4)
+    wt = water_target(d, dd, plan, profile)
+    h, hk = dd.one('health', d), health_of(d, dd)
+    ignored = h.get('ignore') if isinstance(h.get('ignore'), list) else []
+    body = dd.one('body', d)
+    weight = body.get('weight')  # null when the person cleared it: missing
+    feel = body.get('feel') if isinstance(body.get('feel'), dict) else None
+    items = (todos or {}).get('items')
+    custom = (plan or {}).get('custom')
+    return {
+        'date': d, 'today': today,
+        **kind,
+        'targets': {**targets, 'water': wt},
+        'activity': act,
+        'recovery': recovery(d, dd),
+        'intake': intake(d, dd, day_start),
+        'water': {'total': water_total(d, dd), 'target': wt},
+        'sleep': sleep_summary(d, dd),
+        'weight': weight if is_num(weight) else None,
+        'body': {k: body[k] for k in BODY_KEYS if is_num(body.get(k))},
+        'feel': {k: feel[k] for k in FEEL_KEYS if feel.get(k) is not None} if feel else None,
+        'health': {**{k: hk.get(k) for k in (*HEALTH_KEYS, 'syncedAt')}, 'ignore': [k for k in HEALTH_KEYS if k in ignored]} if h else None,
+        'attendance': attendance(d, dd, plan),
+        'reportStale': report_stale(d, dd, report),
+        'todos': [x for x in items if isinstance(x, dict)] if isinstance(items, list) else [],
+        'planCustom': sorted(custom) if isinstance(custom, dict) else [],  # plan values the person set themselves: keep them
+    }
+
+
+def fetch_day(client, d, today, day_start=DAY_START_HOUR):
+    """The records day_summary needs, with as few requests as possible."""
+    end = max(d, add_days(week_start(d), 6))  # the rest of d's week, for attendance
+    rng = client.range(add_days(d, -30), end, DAY_COLLECTIONS)
+    rng['workouts'] = done_only(rng.get('workouts'))
+    lt = [f'date:lt:{json.dumps(d)}']
+    history = {'workouts': done_only(client.list('workouts', lt, 'date', desc=True, limit=50)),
+               'days': client.list('days', lt, 'date', desc=True, limit=50)}
+    plan = (client.get('plan', 'current') or {}).get('data')
+    profile = (client.get('profile', 'main') or {}).get('data')
+    report = client.get('reports', f'daily-{d}')
+    todos = (client.get('todos', d) or {}).get('data')
+    return day_summary(d, today, rng, plan, profile, report, history, todos, day_start)
+
+
+# ---------------------------------------------------------------- command line
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):  # usage errors exit 1 (argparse's default is 2, which here means a server error)
+        self.print_usage(sys.stderr)
+        self.exit(EXIT_USAGE, f'{self.prog}: error: {message}\n')
+
+
+def date_arg(s):
+    try:
+        dt.date.fromisoformat(s)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'{s!r} is not a YYYY-MM-DD date')
+    return s
+
+
+def command_parsers():
+    subs = {}
+
+    def sub(name, user=True):
+        p = Parser(prog=f'lsj {name}')
+        if user:
+            p.add_argument('-u', '--user', default=argparse.SUPPRESS, help='username (or id) whose data to use')
+        subs[name] = p
+        return p
+
+    sub('users', user=False)
+    sub('pending')
+    p = sub('range'); p.add_argument('start', type=date_arg); p.add_argument('end', type=date_arg)
+    p.add_argument('--only', help='comma-separated collections, from: ' + ','.join(RANGE_COLLECTIONS))
+    p = sub('day'); p.add_argument('date', nargs='?', type=date_arg)
+    p = sub('list'); p.add_argument('collection')
+    p.add_argument('-w', '--where', action='append', default=[], help='field:op:json, op in eq ne lt lte gt gte')
+    p.add_argument('--order'); p.add_argument('--desc', action='store_true'); p.add_argument('--limit', type=int, default=1000)
+    p = sub('get'); p.add_argument('collection'); p.add_argument('id')
+    for name in ('set', 'update'):
+        p = sub(name); p.add_argument('collection'); p.add_argument('id')
+        p.add_argument('json', nargs='?', help='JSON inline, a file path, or - for stdin')
+        p.add_argument('--if-version', type=int)
+    p = sub('delete'); p.add_argument('collection'); p.add_argument('id'); p.add_argument('--if-version', type=int)
+    p = sub('batch'); p.add_argument('json', nargs='?', help='JSON inline, a file path, or - for stdin')
+    p = sub('photos'); p.add_argument('collection'); p.add_argument('id')
+    p = sub('photo'); p.add_argument('photo_id')
+    p = sub('notify'); p.add_argument('--kind', required=True, choices=PUSH_KINDS)
+    p.add_argument('--title', required=True, help='at most 40 characters'); p.add_argument('--body', default='', help='at most 120 characters')
+    p.add_argument('--url', default='/', help='a path on the site, e.g. /#claude')
+    return subs
+
+
+def parse_args(argv):
+    """-u may come before or after the command; options and positionals may be mixed in any order."""
+    subs = command_parsers()
+    top = Parser(prog='lsj', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+                 usage='lsj [-u USER] {%s} ...' % ','.join(subs))
+    top.add_argument('-u', '--user', help='username (or id) whose data to use')
+    top.add_argument('command', choices=list(subs), metavar='command', help='one of: ' + ', '.join(subs))
+    top.add_argument('args', nargs=argparse.REMAINDER, help="the command's arguments (lsj <command> -h)")
+    a = top.parse_args(argv)
+    b = subs[a.command].parse_intermixed_args(a.args)
+    sub_user = getattr(b, 'user', None)
+    if a.user and sub_user and a.user != sub_user:
+        top.error(f'-u given twice ({a.user}, {sub_user})')
+    b.user = sub_user or a.user
+    b.cmd = a.command
+    return b
+
+
+def run(argv=None):
+    a = parse_args(sys.argv[1:] if argv is None else argv)
+    client = Client.from_config()
+
+    if a.cmd == 'users':
+        out(client.users())
+        return
+    if a.cmd == 'pending' and not a.user:
+        out([pending_for(client.for_user(u)) for u in client.users() if not u['disabled']])
+        return
+
+    if a.cmd == 'batch':  # read first: a wrapped batch names its account
+        named, ops = unwrap_batch(read_json(a.json))
+        check_ops(ops)
+        for o in ops:
+            client.check_writable(o['collection'])
+        if named:
+            target = client.find_user(named)
+            if not target:
+                raise LsjError(f'the batch is for user {named}, who does not exist', EXIT_USAGE)
+            if a.user and client.pick_user(a.user)['id'] != target['id']:
+                raise LsjError(f'the batch is for {named} but -u is {a.user}; nothing written', EXIT_USAGE)
+            c = client.for_user(target)
+        else:
+            c = client.for_user(a.user)
+        res = c.batch(ops)
+        out([{k: v for k, v in r.items() if k != 'data'} if r else {'deleted': True} for r in res])
+        return
+
+    c = client.for_user(a.user)
+    if a.cmd == 'pending':
+        out(pending_for(c))
+    elif a.cmd == 'range':
+        only = None
+        if a.only:
+            only = [x.strip() for x in a.only.split(',') if x.strip()]
+            bad = [x for x in only if x not in RANGE_COLLECTIONS]
+            if bad or not only:
+                raise LsjError(f'--only takes some of {",".join(RANGE_COLLECTIONS)}' + (f'; not {",".join(bad)}' if bad else ''), EXIT_USAGE)
+        out(c.range(a.start, a.end, only))
+    elif a.cmd == 'day':
+        start = day_start_of(c.user)
+        today = user_today(start=start, tz=c.user.get('tz'))
+        out({'user': c.user['username'], 'dayStartHour': start, **fetch_day(c, a.date or today, today, start)})
+    elif a.cmd == 'list':
+        out(c.list(a.collection, a.where, a.order, a.desc, a.limit))
+    elif a.cmd == 'get':
+        d = c.get(a.collection, a.id)
+        if d is None:
+            raise LsjError(f'{a.collection}/{a.id} does not exist', EXIT_NOT_FOUND)
+        out(d)
+    elif a.cmd in ('set', 'update', 'delete'):
+        c.check_writable(a.collection)
+        body = read_json(a.json) if a.cmd != 'delete' else None
+        res = c.write(a.cmd, a.collection, a.id, body, a.if_version)
+        out({k: v for k, v in res.items() if k != 'data'})
+    elif a.cmd == 'photos':
+        d = c.get(a.collection, a.id)
+        if d is None:
+            raise LsjError(f'{a.collection}/{a.id} does not exist', EXIT_NOT_FOUND)
+        photos = d['data'].get('photos') or []
+        if isinstance(photos, dict):  # progress (身材照): {front, side, back}
+            names = dict(PROGRESS_VIEWS)
+            for view in [v for v, _ in PROGRESS_VIEWS] + sorted(set(photos) - set(names)):
+                if photos.get(view):
+                    print(names.get(view, view), c.photo(photos[view]))
+        else:
+            for pid in photos:
+                print(c.photo(pid))
+        for pid in d['data'].get('leftovers') or []:  # meals: photos of what was left after eating
+            print('剩菜', c.photo(pid))
+    elif a.cmd == 'notify':
+        check_notice(a.title, a.body, a.url)
+        out(c.notify(a.kind, a.title, a.body, a.url))
+    elif a.cmd == 'photo':
+        print(c.photo(a.photo_id))
+
+
+def main(argv=None):
+    try:
+        run(argv)
+    except LsjError as e:
+        die(f'lsj: {e}', e.code)
+    except KeyboardInterrupt:
+        die('lsj: interrupted', 130)
+    except BrokenPipeError:
+        sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

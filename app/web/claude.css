@@ -1,0 +1,294 @@
+/* Claude (claude.js): the page behind ✦, 今日's 「等你拍板」 (todayHTML) and 我的 → Claude (meHTML) with their sheets.
+   Only app.css tokens (--agent, --agent-soft, --r, --shadow …) and its shared classes (.panel .sec .btn .chip .tag
+   .kind .ag-mark); every class added here starts with .cl- so dark mode follows the tokens on its own. The 抽象 skin
+   of these is at the end (html[data-style="abstract"] …), so this file doesn't depend on abstract.css for it. */
+.cl-page{display:flex;flex-direction:column}
+.cl-sec{scroll-margin-top:calc(68px + env(safe-area-inset-top,0px))}
+@keyframes cl-flash{from{background:var(--agent-soft)}to{background:transparent}}
+.cl-flash{animation:cl-flash 1.6s ease-out;border-radius:var(--r)}
+.cl-when{font-family:var(--f-num);font-size:14px;color:var(--muted);white-space:nowrap}
+.cl-none{margin:0 0 4px;font-size:13.5px;color:var(--muted);line-height:1.5}
+.cl-ds{margin:0;color:var(--muted);font-size:13px}
+.cl-arr{color:var(--muted);flex:none}
+.cl-more{display:inline-flex;align-items:center;min-height:44px;align-self:flex-start}
+.cl-page .hint{margin-top:8px}
+.cl-page .sec-h .count{font-size:14px}
+
+/* 1. when Claude looks: one small line */
+.cl-top{display:flex;flex-wrap:wrap;align-items:baseline;margin:0 2px 18px;font-size:13px;color:var(--muted);line-height:1.6}
+.cl-top > span{white-space:nowrap}
+.cl-top > span:not(.cl-warn):not(:last-child)::after{content:"·";margin:0 6px}
+.cl-warn{color:var(--warn);white-space:normal}
+
+/* 2. 等你拍板: proposals */
+.cl-prop{padding:16px;display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.cl-prop h3{margin:0;font-size:17px;line-height:1.35}
+.cl-prop-h{display:flex;align-items:center;gap:8px}
+.cl-prop-h .cl-when{margin-left:auto}
+.cl-kind{font-size:12px;font-weight:700;color:var(--agent);background:var(--agent-soft);border-radius:6px;padding:2px 8px;white-space:nowrap;flex:none}
+.cl-why{margin:0;font-size:14px;line-height:1.55}
+.cl-chgs{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.cl-chg{padding:10px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px;min-width:0}
+.cl-chg-l{font-size:12.5px;color:var(--muted);font-weight:600}
+.cl-v{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;font-size:15px;min-width:0}
+.cl-old{color:var(--muted)}
+.cl-new{font-weight:700}
+.cl-new.del{color:var(--danger)}
+.cl-dl{list-style:none;margin:2px 0 0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:14px}
+.cl-dl li{display:grid;grid-template-columns:16px minmax(0,1fr);gap:6px;align-items:baseline}
+.cl-dl b{font-weight:600}
+.cl-dm{font-weight:700;text-align:center;font-family:var(--f-num);font-size:17px;line-height:1}
+.cl-dl .add .cl-dm{color:var(--good)}
+.cl-dl .del .cl-dm{color:var(--danger)}
+.cl-dl .del b{color:var(--muted);text-decoration:line-through}
+.cl-dl .mod .cl-dm{color:var(--agent)}
+.cl-acts{display:flex;gap:10px;margin-top:4px}
+.cl-acts .btn{flex:1;min-width:0}
+.cl-acts .btn.ghost{flex:0 0 auto;min-width:96px}
+.cl-acts .btn:disabled,.sheet-f .btn:disabled{opacity:.6}
+/* the same proposal in its sheet (详情 from 今日): no card around it, the buttons in the footer */
+.sheet-b .cl-prop{padding:0;margin:0}
+.sheet-f [data-act="c-decline"]{min-width:96px}
+
+/* 训记模版 in a proposal: one block per template, from the mutation itself */
+.cl-tpls{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.cl-tpl{border-bottom:1px solid var(--line)}
+.cl-tpl summary{list-style:none;display:grid;grid-template-columns:auto minmax(0,1fr) 14px;gap:1px 8px;align-items:center;padding:10px 0;min-height:48px;cursor:pointer}
+.cl-tpl summary::-webkit-details-marker{display:none}
+.cl-tpl summary::after{content:"";grid-column:3;grid-row:1/3;width:8px;height:8px;border-right:1.8px solid var(--muted);border-bottom:1.8px solid var(--muted);transform:rotate(45deg);margin-top:-4px}
+.cl-tpl[open] summary::after{transform:rotate(-135deg);margin-top:4px}
+.cl-op{font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:6px;white-space:nowrap;justify-self:start}
+.cl-op.new{background:var(--good-soft);color:var(--good)}
+.cl-op.upd{background:var(--accent-soft);color:var(--accent)}
+.cl-op.del{background:var(--warn-soft);color:var(--danger)}
+.cl-tpl-n{font-weight:700;min-width:0;overflow-wrap:anywhere}
+.cl-tpl-s{grid-column:2;font-size:12.5px;color:var(--muted)}
+.cl-tpl-del{display:flex;align-items:center;gap:8px;padding:10px 0;min-height:48px}
+.cl-tpl-del .cl-tpl-s{margin-left:auto}
+.cl-mv{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:6px}
+.cl-mv li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 10px;font-size:14px;background:var(--sunk);border-radius:var(--r-s);padding:8px 12px}
+.cl-mv-n{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.cl-mv-s{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cl-mv-p{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
+
+/* 2. 等你拍板: Claude's questions */
+.cl-q{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.cl-q-h{display:flex;align-items:center;gap:8px}
+.cl-q-h .cl-when{margin-left:auto}
+.cl-q-rec{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;text-align:left;font-size:13px;color:var(--muted)}
+.cl-q-rec > span:nth-child(2){flex:1;min-width:0}
+.cl-q-rec b{color:var(--ink);font-weight:600}
+.cl-go{color:var(--accent);font-weight:600;white-space:nowrap}
+.cl-q-q{margin:0;font-size:16px;font-weight:600;line-height:1.45}
+.cl-opts{display:flex;flex-wrap:wrap;gap:8px}
+.cl-opts .chip{min-height:40px}
+.cl-ans{display:flex;gap:8px}
+.cl-ans input{flex:1;min-width:0}
+.cl-ans .btn{height:44px;flex:none}
+
+/* 3. 告诉 Claude */
+.cl-compose{padding:12px;display:flex;flex-direction:column;gap:10px}
+.cl-compose textarea,.sheet-b #c-cmp{resize:none;border-radius:var(--r-s);min-height:68px;line-height:1.5}
+.sheet-b #c-cmp{min-height:112px}
+.sheet-b #c-mem-t{resize:none;min-height:88px}
+.cl-quick{gap:6px}
+.cl-quick .chip{min-height:40px;font-size:13px;flex:none}
+/* on the page the chips are one row that scrolls sideways (the box stays short); in the sheet they wrap */
+.cl-compose .cl-quick{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-12px;padding:2px 12px 4px;scroll-padding-inline:12px}
+.cl-compose .cl-quick::-webkit-scrollbar{display:none}
+.cl-compose-f{display:flex;align-items:center;gap:10px}
+.cl-hint{flex:1;min-width:0;font-size:12px;color:var(--muted);line-height:1.4}
+.cl-compose-f .btn{height:40px;flex:none}
+
+/* 4. 往来: one list, a label column (你说 / 日报 / 改计划 / 同意了 …), what it was, and a date or an action */
+.cl-tl{list-style:none;margin:0;padding:0 14px}
+.cl-tl-i{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:4px 10px;align-items:start;padding:10px 0;font-size:14.5px;line-height:1.45}
+.cl-tl-i + .cl-tl-i{border-top:1px solid var(--line)}
+.cl-tl-i > .kind,.cl-tl-r > .kind{justify-self:start;margin-top:1px}
+.cl-tl-m{min-width:0;overflow-wrap:anywhere;display:flex;flex-direction:column;gap:2px}
+.cl-tl-m small{font-size:12.5px;color:var(--muted);line-height:1.45}
+.cl-tl-m small b{color:var(--ink);font-weight:600}
+.cl-tl-m.undone > span{color:var(--muted)}
+.cl-tl-d{font-size:13px;color:var(--muted);white-space:nowrap;margin-top:1px}
+.cl-tl-i .btn.sm{height:36px;padding-inline:12px;margin-block:-4px}
+.cl-tl-i > .tag{margin-top:1px}
+.cl-tl-b{display:block;padding:0}
+.cl-tl-r{display:grid;grid-template-columns:56px minmax(0,1fr) 16px;gap:10px;align-items:center;width:100%;min-height:44px;padding:8px 0;text-align:left;font-size:14.5px;line-height:1.45}
+.cl-tl-r b{font-weight:600;min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.cl-tl-r svg{width:16px;height:16px;color:var(--muted)}
+.cl-tl-msg .cl-msg-t{margin:0;font-size:15px;white-space:pre-wrap;overflow-wrap:anywhere}
+.cl-tl-msg .cl-reply{margin-top:6px}
+.kind.cl-k-you,.kind.cl-k-ans{background:var(--accent-soft);color:var(--accent)}
+.kind.cl-k-chg{background:var(--agent-soft);color:var(--agent)}
+.kind.cl-k-ok{background:var(--good-soft);color:var(--good)}
+.kind.cl-k-no{background:var(--sunk);color:var(--muted)}
+.kind.cl-k-fail{background:var(--warn-soft);color:var(--warn)}
+.cl-reply{display:flex;gap:10px;align-items:flex-start;background:var(--agent-soft);border-radius:4px var(--r-s) var(--r-s) var(--r-s);padding:10px 12px}
+.cl-reply .ag-mark{margin-top:1px}
+.cl-reply > div{min-width:0}
+.cl-reply p{margin:0;font-size:14.5px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
+.cl-reply small{display:block;margin-top:4px;color:var(--muted);font-size:12px}
+.cl-reply small b{color:var(--agent)}
+.cl-reply.fresh{box-shadow:inset 0 0 0 1.5px var(--agent)}
+.cl-del{position:relative;min-height:30px;padding:0 10px;border-radius:8px;font-size:13px;color:var(--muted);white-space:nowrap;flex:none}
+.cl-del::after{content:"";position:absolute;inset:-7px -2px}
+.cl-del.confirm{background:var(--danger);color:var(--surface);font-weight:600}
+.cl-del:disabled{opacity:.5}
+/* a message: what was said, its time (and 删除 while Claude hasn't read it), the reply under it, all as wide as the row */
+.cl-tl-msg .cl-tl-m{grid-column:2/-1}
+.cl-tl-s{display:flex;align-items:center;gap:8px;min-height:20px}
+.cl-tl-s small{flex:1;min-width:0}
+.cl-tl-s .cl-del{margin-block:-6px;margin-right:-10px}
+
+/* 今日 · 等你拍板 (todayHTML): rows inside app.js's Claude card. A proposal on one line (kind, title, two small buttons);
+   a question on two (the question; its options in one row that scrolls sideways). The small buttons and chips are 40px
+   to tap, the pill drawn inside smaller. */
+.cl-today{display:flex;flex-direction:column;min-width:0}
+.cl-tr{display:flex;align-items:center;gap:4px;min-height:44px;min-width:0}
+.cl-today > * + *{border-top:1px solid color-mix(in srgb,var(--agent) 14%,transparent)}
+.cl-tr-t{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:44px;padding:0;text-align:left;color:var(--ink)}
+.cl-tr-t b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14.5px;font-weight:600}
+.cl-tr-t .cl-kind{font-size:11.5px;padding:1px 7px;background:var(--surface)}
+.cl-tr-ql{color:var(--agent);font-weight:700}
+.cl-tr-b{display:flex;flex:none;margin-right:-3px}
+.cl-tb{display:inline-grid;place-items:center;height:40px;min-width:44px;padding:0 3px;flex:none}
+.cl-tb > span{display:inline-flex;align-items:center;height:30px;padding:0 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;white-space:nowrap}
+.cl-tb.pri > span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.cl-tb:active > span{filter:brightness(.94)}
+.cl-tb:disabled,.cl-tc:disabled{opacity:.55}
+.cl-tr-q{flex-direction:column;align-items:stretch;gap:0;padding-bottom:2px}
+.cl-tr-q .cl-tr-t{min-height:38px}
+.cl-tr-o{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-top:-2px}
+.cl-tr-o::-webkit-scrollbar{display:none}
+.cl-tc{display:inline-grid;place-items:center;height:40px;flex:none;padding:0}
+.cl-tc > span{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:999px;border:1px solid color-mix(in srgb,var(--agent) 30%,var(--line));background:var(--surface);color:var(--ink);font-size:13px;white-space:nowrap}
+.cl-tc:active > span{background:var(--sunk)}
+.cl-tc-w > span{border-style:dashed;color:var(--muted)}
+/* 「写一句…」 open: the box in the chips' row, the same height */
+.cl-tr-a{display:flex;align-items:center;gap:4px;height:40px;margin-top:-2px}
+.cl-tr-a input{flex:1;min-width:0;width:auto;height:36px;min-height:0;padding:0 12px;border-radius:999px;font-size:16px;scroll-margin-block:80px}
+.cl-tx{display:inline-grid;place-items:center;width:40px;height:40px;flex:none;color:var(--muted)}
+.cl-tx svg{width:18px;height:18px;stroke-width:2}
+.cl-t-more{display:flex;align-items:center;gap:4px;min-height:40px;padding:0;color:var(--agent);font-size:13.5px;font-weight:600;text-align:left}
+.cl-t-more svg{width:14px;height:14px;stroke-width:2.2}
+
+/* 我的 → Claude (meHTML): app.js's row markup (.me-g, .me-row, .me-rt), one row each with a sheet behind. app.js styles
+   those; the rules here only stand in while it doesn't (zero specificity through :where, so its own win). */
+:where(.cl-me){display:flex;flex-direction:column;overflow:hidden}
+:where(.cl-me-r){display:flex;align-items:center;gap:10px;width:100%;min-height:56px;padding:9px 14px;text-align:left}
+:where(.cl-me-r + .cl-me-r){border-top:1px solid var(--line)}
+:where(.cl-me-r .me-rt){flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+:where(.cl-me-r .me-rt b){font-size:15px;font-weight:600}
+:where(.cl-me-r .me-rt small){font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:where(.cl-me-r > svg){flex:none;width:16px;height:16px;color:var(--muted)}
+/* when app.js puts it inside a card of its own: no second card */
+.panel .cl-me.panel{background:none;border:0;box-shadow:none;border-radius:0}
+
+/* sheet · Claude 做过的 */
+.cl-logp{padding:2px 14px 6px}
+.cl-day{margin:12px 0 2px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.cl-log{list-style:none;margin:0;padding:0}
+.cl-log-r{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:10px;align-items:start;padding:9px 0;font-size:14px;line-height:1.5}
+.cl-log-r + .cl-log-r{border-top:1px solid var(--line)}
+.cl-log-tm{color:var(--muted);font-size:15px;line-height:1.4}
+.cl-log-m{min-width:0;overflow-wrap:anywhere}
+.cl-log-m small{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.cl-log-k{display:inline-block;font-size:11px;font-weight:700;line-height:18px;color:var(--muted);background:var(--sunk);border-radius:5px;padding:0 6px;margin-right:6px;vertical-align:1px}
+.cl-log-k.k-plan,.cl-log-k.k-memory{color:var(--agent);background:var(--agent-soft)}
+.cl-log-k.k-decision{color:var(--accent);background:var(--accent-soft)}
+.cl-log-k.k-xunji{color:var(--warn);background:var(--warn-soft)}
+.cl-log-r.undone .cl-log-m{color:var(--muted)}
+.cl-log-r .btn.sm{height:36px;padding-inline:12px}
+.cl-log-r .tag{margin-top:2px}
+.sheet-b .cl-more{margin-block:-8px}
+
+/* sheet · Claude 记得的 */
+.cl-memp{display:flex;flex-direction:column;overflow:hidden}
+.cl-mg h3{margin:12px 14px 0;font-size:12.5px;font-weight:600;color:var(--muted)}
+.cl-mg ul{list-style:none;margin:0;padding:0}
+.cl-mg li + li{border-top:1px solid var(--line);margin-left:14px}
+.cl-mg li + li .cl-mem-r{padding-left:0}
+.cl-mem-r{display:grid;grid-template-columns:minmax(0,1fr) auto 14px;gap:8px;align-items:center;width:100%;min-height:46px;padding:10px 14px;text-align:left;font-size:14.5px;line-height:1.45}
+.cl-mem-r > span:first-child{overflow-wrap:anywhere}
+.cl-mem-r svg{width:14px;height:14px;color:var(--muted)}
+.cl-by{font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:1px 7px;white-space:nowrap}
+.cl-memp .cl-none{padding:14px 14px 4px}
+.cl-add{display:flex;align-items:center;width:100%;min-height:48px;padding:0 14px;margin-top:6px;border-top:1px solid var(--line);color:var(--accent);font-weight:600;font-size:14.5px;text-align:left}
+/* 记得的 sheet: 7 kinds in two rows */
+.cl-mk button{flex:1 0 calc(25% - 6px)}
+
+/* sheet · 常吃的菜 */
+.cl-fds{list-style:none;margin:0;padding:0 6px 0 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.cl-fd{display:flex;align-items:center;gap:8px;padding:9px 0;font-size:14px;min-height:46px}
+.cl-fd + .cl-fd{border-top:1px solid var(--line)}
+.cl-fd > div{flex:1;min-width:0;overflow-wrap:anywhere}
+.cl-fd small{color:var(--muted);font-size:12.5px;margin-left:6px}
+.cl-fd-n{display:block;font-size:12.5px;color:var(--muted)}
+.cl-fd-n i{font-style:normal;margin-left:4px;padding:0 5px;border-radius:4px;border:1px solid var(--line)}
+
+/* sheet · 工作方式 / 人设 */
+.cl-autop{padding:4px 14px 12px}
+.cl-opts2{display:flex;flex-direction:column}
+.cl-opt{display:grid;grid-template-columns:22px minmax(0,1fr);gap:10px;align-items:start;width:100%;min-height:48px;padding:11px 0;text-align:left}
+.cl-opt + .cl-opt{border-top:1px solid var(--line)}
+.cl-opt b{display:block;font-size:15px;font-weight:600}
+.cl-opt small{display:block;margin-top:2px;font-size:12.5px;color:var(--muted);line-height:1.45}
+.cl-radio{width:20px;height:20px;margin-top:2px;border-radius:50%;border:2px solid var(--line);background:var(--surface)}
+.cl-opt[aria-checked="true"] .cl-radio{border-color:var(--agent);background:var(--agent);box-shadow:inset 0 0 0 4px var(--surface)}
+.cl-opt:disabled{opacity:.6}
+.cl-rules{margin:4px 0 0;padding:10px 0 0 18px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+
+/* ---------- 抽象风 ---------- */
+html[data-style="abstract"] .cl-top{color:var(--ink)}
+html[data-style="abstract"] .cl-warn{color:var(--warn);font-weight:700}
+html[data-style="abstract"] .cl-prop h3{font-weight:800;-webkit-text-stroke:.35px currentColor}
+html[data-style="abstract"] .cl-prop h3{font-size:18px}
+html[data-style="abstract"] .cl-kind{background:var(--neon);color:var(--neon-ink);border:1.5px solid var(--stroke);rotate:-2deg}
+html[data-style="abstract"] :is(.cl-chgs,.cl-chg,.cl-tpls,.cl-tpl){border-color:var(--sep)}
+html[data-style="abstract"] .cl-op{border:1.5px solid var(--stroke)}
+html[data-style="abstract"] .cl-new{font-weight:800}
+html[data-style="abstract"] .cl-mv li{border:1.5px solid var(--stroke)}
+html[data-style="abstract"] .cl-q-q{font-weight:800}
+html[data-style="abstract"] .cl-q-q{font-size:16.5px}
+html[data-style="abstract"] .cl-go,html[data-style="abstract"] .cl-add{font-weight:800}
+/* 往来 */
+html[data-style="abstract"] :is(.cl-tl-i,.cl-log-r,.cl-opt,.cl-fd) + *{border-top-color:var(--sep)}
+:where(html[data-style="abstract"] .cl-me-r + .cl-me-r){border-top-color:var(--sep)}
+html[data-style="abstract"] .cl-tl-r b{font-weight:800}
+html[data-style="abstract"] .cl-tl-m small b{font-weight:800}
+html[data-style="abstract"] :is(.kind.cl-k-you,.kind.cl-k-ans){background:var(--pop-yellow);color:var(--pop-ink)}
+html[data-style="abstract"] .kind.cl-k-chg{background:var(--neon);color:var(--neon-ink)}
+html[data-style="abstract"] .kind.cl-k-ok{background:var(--good-soft);color:var(--good)}
+html[data-style="abstract"] .kind.cl-k-no{background:var(--sunk);color:var(--muted)}
+html[data-style="abstract"] .kind.cl-k-fail{background:var(--warn-soft);color:var(--warn)}
+html[data-style="abstract"] .cl-reply{background:var(--agent-soft);border:1.5px solid var(--stroke);color:var(--ink)}
+html[data-style="abstract"] .cl-reply.fresh{box-shadow:3px 3px 0 var(--hard-ag)}
+html[data-style="abstract"] .cl-reply small b{color:var(--ink)}
+html[data-style="abstract"] .cl-del.confirm{color:#fff;background:var(--danger)}
+/* 今日 */
+html[data-style="abstract"] .cl-today > * + *{border-top:1.5px dashed color-mix(in srgb,var(--ink) 30%,transparent)}
+html[data-style="abstract"] .cl-tr-t b{font-weight:800}
+html[data-style="abstract"] .cl-tr-ql{color:var(--ink)}
+html[data-style="abstract"] .cl-tb > span{border:1.5px solid var(--stroke);box-shadow:var(--shadow-xs);font-weight:700}
+html[data-style="abstract"] .cl-tb.pri > span{background:var(--accent);color:var(--accent-ink)}
+html[data-style="abstract"] .cl-tb:active > span{translate:1px 1px;box-shadow:none}
+html[data-style="abstract"] .cl-tc > span{border:1.5px solid var(--stroke);font-weight:700}
+html[data-style="abstract"] .cl-tc-w > span{border-style:dashed;color:var(--ink)}
+html[data-style="abstract"] .cl-tr-a input{border:2px solid var(--stroke)}
+html[data-style="abstract"] .cl-tx{color:var(--ink)}
+html[data-style="abstract"] .cl-t-more{color:var(--ink);font-weight:800}
+/* 我的 and the sheets */
+:where(html[data-style="abstract"] .cl-me-r .me-rt b){font-weight:800}
+html[data-style="abstract"] .cl-fds{border:2px solid var(--stroke);box-shadow:var(--shadow);border-radius:var(--r)}
+html[data-style="abstract"] .cl-log-k{border:1px solid var(--stroke);color:var(--ink)}
+html[data-style="abstract"] :is(.cl-log-k.k-plan,.cl-log-k.k-memory){background:var(--neon);color:var(--neon-ink)}
+html[data-style="abstract"] .cl-log-k.k-decision{background:var(--pop-cyan);color:var(--pop-ink)}
+html[data-style="abstract"] .cl-log-k.k-xunji{background:var(--pop-yellow);color:var(--pop-ink)}
+html[data-style="abstract"] .cl-by{border:1px solid var(--stroke)}
+html[data-style="abstract"] .cl-mg h3,html[data-style="abstract"] .cl-day{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .cl-add{border-top:2px dashed var(--sep)}
+html[data-style="abstract"] .cl-radio{border:2px solid var(--stroke)}
+html[data-style="abstract"] .cl-opt[aria-checked="true"] .cl-radio{border-color:var(--stroke);background:var(--accent);box-shadow:inset 0 0 0 3px var(--surface)}
+html[data-style="abstract"] .cl-opt b{font-weight:800}
+html[data-style="abstract"] .cl-opt[aria-checked="true"] b{width:fit-content;background:linear-gradient(transparent 58%,var(--hl) 58%,var(--hl) 92%,transparent 92%)}
+html[data-style="abstract"] .panel .cl-me.panel{border:0;box-shadow:none}

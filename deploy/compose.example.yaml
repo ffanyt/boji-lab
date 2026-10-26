@@ -1,0 +1,38 @@
+# Docker Compose: the app plus Caddy for automatic HTTPS. From the repository root:
+#   cp .env.example .env          # set LSJ_TOKEN, LSJ_PASSWORD and LSJ_DOMAIN
+#   docker compose -f deploy/compose.example.yaml --env-file .env up -d --build
+# Data lives in the lianshiji-data volume (data.db and photos/); see deploy/README.md for backups.
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    env_file: ../.env
+    environment:
+      LSJ_HOST: 127.0.0.1          # only Caddy, which shares this network namespace, can reach the app
+      LSJ_DATA: /data
+    volumes:
+      - lianshiji-data:/data
+    ports:                         # published here because Caddy runs inside the app's network namespace
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8.4
+    network_mode: "service:app"    # Caddy reaches the app on 127.0.0.1, so the app trusts its X-Real-IP
+    environment:
+      LSJ_DOMAIN: ${LSJ_DOMAIN:?set LSJ_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile.example:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  lianshiji-data:
+  caddy-data:
+  caddy-config:

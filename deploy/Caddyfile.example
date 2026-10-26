@@ -1,0 +1,12 @@
+# Caddy in front of the app (used by deploy/compose.example.yaml). Caddy gets and renews the certificate for
+# LSJ_DOMAIN by itself; ports 80 and 443 must reach this machine.
+{$LSJ_DOMAIN} {
+	# JSON is at most 1 MiB and photos 20 MiB in the app
+	request_body {
+		max_size 21MB
+	}
+	reverse_proxy 127.0.0.1:8780 {
+		# the app believes X-Real-IP only on connections from 127.0.0.1, which is why Caddy shares its network
+		header_up X-Real-IP {remote_host}
+	}
+}

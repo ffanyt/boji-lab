@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 80 840 840" width="840" height="840">
+<title>一碗米饭，哑铃搁在上面</title>
+<defs>
+<pattern id="d" width="64" height="64" patternUnits="userSpaceOnUse"><circle cx="32" cy="32" r="5" fill="#111" fill-opacity=".07"/></pattern>
+<clipPath id="bw"><path d="M176 556H848C848 724 708 842 512 842S176 724 176 556Z"/></clipPath>
+<g id="db"><rect x="226" y="310" width="572" height="40" rx="20"/><rect x="292" y="212" width="74" height="236" rx="26"/><rect x="232" y="248" width="60" height="164" rx="22"/><rect x="658" y="212" width="74" height="236" rx="26"/><rect x="732" y="248" width="60" height="164" rx="22"/></g>
+</defs>
+
+<!-- rice -->
+<path d="M218 566C218 412 352 344 512 344S806 412 806 566Z" fill="#FFFFFF" stroke="#111" stroke-width="32" stroke-linejoin="round"/>
+<g stroke="#D8CCAA" stroke-width="16" stroke-linecap="round"><path d="M360 470l22 12"/><path d="M452 432l24-8"/><path d="M560 470l18 16"/><path d="M650 448l24 6"/><path d="M300 524l20-14"/><path d="M712 520l-20-12"/><path d="M498 516h26"/><path d="M410 520l16 12"/><path d="M604 524l20-10"/></g>
+<!-- bowl -->
+<path d="M176 556H848C848 724 708 842 512 842S176 724 176 556Z" transform="translate(24 26)" fill="#111"/>
+<rect x="400" y="818" width="224" height="64" rx="22" transform="translate(24 26)" fill="#111"/>
+<rect x="400" y="818" width="224" height="64" rx="22" fill="#FFF6D9" stroke="#111" stroke-width="32"/>
+<path d="M176 556H848C848 724 708 842 512 842S176 724 176 556Z" fill="#FFF6D9"/>
+<g clip-path="url(#bw)"><rect x="150" y="626" width="724" height="70" fill="#7B2FF7"/><path d="M150 626H874M150 696H874" stroke="#111" stroke-width="22"/>
+<g fill="#FFE14D" stroke="#111" stroke-width="12"><circle cx="300" cy="661" r="15"/><circle cx="406" cy="661" r="15"/><circle cx="512" cy="661" r="15"/><circle cx="618" cy="661" r="15"/><circle cx="724" cy="661" r="15"/></g></g>
+<path d="M176 556H848C848 724 708 842 512 842S176 724 176 556Z" fill="none" stroke="#111" stroke-width="34" stroke-linejoin="round"/>
+<rect x="156" y="526" width="712" height="60" rx="30" fill="#FFF6D9" stroke="#111" stroke-width="32"/>
+<!-- dumbbell resting on the rice like chopsticks -->
+<g transform="rotate(-13 512 330)">
+<use href="#db" transform="translate(16 20)" fill="#111"/>
+<use href="#db" fill="#7B2FF7" stroke="#111" stroke-width="30" stroke-linejoin="round"/>
+<rect x="420" y="318" width="184" height="24" rx="12" fill="#111"/>
+</g>
+<path d="M190 120C198 172 210 184 262 192C210 200 198 212 190 264C182 212 170 200 118 192C170 184 182 172 190 120Z" fill="#FFE14D" stroke="#111" stroke-width="18" stroke-linejoin="round"/>
+<path d="M850 120C855 152 862 159 894 164C862 169 855 176 850 208C845 176 838 169 806 164C838 159 845 152 850 120Z" fill="#FFFFFF" stroke="#111" stroke-width="14" stroke-linejoin="round"/>
+</svg>

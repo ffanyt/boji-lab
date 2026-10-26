@@ -1,0 +1,65 @@
+# 薄肌研究所 (lianshiji): HTTPS reverse proxy in front of the app on 127.0.0.1:8780.
+# Install: copy to /etc/nginx/sites-available/lianshiji, replace the placeholders (fitness.example.com, certificate
+# paths), link it into sites-enabled, then `nginx -t && systemctl reload nginx`. See deploy/README.md.
+#
+# limit_req_zone is only allowed in the http {} context. Files in sites-enabled/ and conf.d/ are included inside
+# http {} by the stock Debian/Ubuntu nginx.conf, so the line below is in the right place there. If you include this
+# file anywhere else, move the line into the http {} block of nginx.conf.
+limit_req_zone $binary_remote_addr zone=lsj_login:1m rate=6r/m;
+
+# Optional: send plain-http visitors to https (and serve ACME HTTP-01 challenges if you renew certificates that way).
+# server {
+#     listen 80;
+#     listen [::]:80;
+#     server_name fitness.example.com;
+#     location /.well-known/acme-challenge/ { root /var/www/acme; }
+#     location / { return 301 https://$host$request_uri; }
+# }
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name fitness.example.com;
+
+    ssl_certificate     /etc/nginx/ssl/lianshiji/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/lianshiji/key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    # TLS 1.2: ECDHE key exchange with AEAD ciphers only (TLS 1.3 suites are not affected by this line)
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:lianshiji:5m;
+    ssl_session_tickets off;
+
+    server_tokens off;
+    # JSON bodies are at most 1 MiB in the app too; only photo uploads (20 MiB in the app) get more, below
+    client_max_body_size 1m;
+    add_header X-Frame-Options DENY always;
+    # With a real domain name (not a bare IP) you can also turn on HSTS once HTTPS works:
+    # add_header Strict-Transport-Security "max-age=31536000" always;
+
+    # Proxy settings for every location below. Deliberately no upstream {} block with keepalive: every request gets
+    # its own connection to the small threaded app, so idle pooled connections can't tie up its threads.
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;   # the app believes it only on connections from this machine
+    proxy_set_header Connection "";
+    proxy_read_timeout 60s;
+    proxy_request_buffering on;
+
+    # login: 6 attempts a minute per client address, short bursts allowed; the app adds its own lockout
+    location = /api/login {
+        limit_req zone=lsj_login burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:8780;
+    }
+
+    # photo uploads (POST /api/photos)
+    location = /api/photos {
+        client_max_body_size 21m;
+        proxy_pass http://127.0.0.1:8780;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8780;
+    }
+}

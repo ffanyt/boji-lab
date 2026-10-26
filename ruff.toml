@@ -1,0 +1,20 @@
+# Lint settings (CI runs `ruff check`). No formatter: the code keeps its current compact style.
+# bin/lsj and bin/xunji have no .py suffix, so they are listed explicitly.
+extend-include = ["bin/lsj", "bin/xunji"]
+line-length = 140
+target-version = "py39"          # the oldest Python in use (macOS system python3)
+
+[lint]
+# pycodestyle, pyflakes, bugbear and bandit-style security checks
+select = ["E", "F", "W", "B", "S"]
+ignore = [
+    "E501",   # long lines: line-length is a guide, not a rule
+    "E701", "E702", "E731",   # compact one-liners (`if x: y`, `a; b`, small lambdas) are the house style
+    "B904",   # `raise ApiError(...)` / `sys.exit(...)` inside except: the original error is deliberately replaced
+    "S101",   # assert
+    "S310",   # urllib with fixed https URLs (训记 API)
+    "S603", "S607",   # subprocess with fixed argument lists (shortcuts, aea, openssl)
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["S"]

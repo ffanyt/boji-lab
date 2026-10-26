@@ -1,0 +1,36 @@
+# Owner-only notes and local Claude Code settings
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Local deploy target, owner-only deploy files (real nginx config, signing helper, extra secret patterns)
+deploy/.deploy.env
+deploy/local/
+
+# Secrets and env files (the examples are committed)
+*.env
+.env
+!.env.example
+
+# Build output: the signed Shortcut has the server address baked in (deploy/make-shortcut.py builds it)
+app/web/lianshiji-health.shortcut
+*.shortcut
+
+# Data: databases, photos, backups (a local test server writes these wherever LSJ_DATA points)
+*.db
+*.db-wal
+*.db-shm
+data/
+photos/
+backups/
+
+# Python, tools, OS
+__pycache__/
+*.pyc
+.ruff_cache/
+.venv/
+venv/
+.DS_Store
+promo/
+
+# Claude Code scratch files (batch files there hold real records)
+scratchpad/

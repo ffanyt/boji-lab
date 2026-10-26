@@ -1,0 +1,5 @@
+# Build context for deploy/Dockerfile: only the app goes into the image.
+*
+!app/
+**/__pycache__
+**/.DS_Store

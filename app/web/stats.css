@@ -1,0 +1,323 @@
+/* 数据 tab (stats.js): 本周 and the weekly report, the six cards (身体变化, 睡眠和恢复, 活动, 饮食, 训练, 报告), 动作详情.
+   Colours and radii are app.css tokens (new ones with a fallback, so the page holds up before app.css has them); dark
+   mode follows on its own except where noted. The 抽象 style's rules for this page's own pieces are at the end. */
+.dv{display:flex;flex-direction:column}
+.dv .na{color:var(--muted);font-weight:400}
+.dv-note{margin:0;font-size:12px;line-height:1.5;color:var(--muted)}
+
+/* 本周 */
+.dv-week{padding:12px 16px 14px;display:flex;flex-direction:column;gap:10px;border-radius:var(--r,16px);box-shadow:var(--shadow,none)}
+.dv-wk{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}
+.dv-wk th,.dv-wk td{padding:8px 0;text-align:left;vertical-align:baseline;border-top:1px solid var(--line)}
+.dv-wk tbody tr:first-child th,.dv-wk tbody tr:first-child td{border-top:0}
+.dv-wk thead th{border-top:0;padding:0 0 2px;font-size:12px;color:var(--muted);font-weight:600}
+.dv-wk th[scope=row]{width:36%;font-weight:400;color:var(--muted);padding-right:6px;font-size:13px}
+.dv-wk th[scope=row] small{font-size:11px;margin-left:3px;opacity:.85}
+.dv-wk.one th[scope=row]{width:44%}
+.dv-wk td{padding-right:6px;line-height:1.25}
+.dv-wk b{font-family:var(--f-num);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.dv-wk .tg{display:inline-block;font-family:var(--f-num);font-size:13px;color:var(--muted);margin-left:1px;white-space:nowrap}
+.dv-wk .pv,.dv-wk .pv b{color:var(--muted)}
+.dv-wk .pv b{font-weight:500;font-size:16px}
+.dv-wk .dl{display:inline-block;font-family:var(--f-num);font-size:13px;color:var(--muted);margin-left:5px;white-space:nowrap}
+
+/* the 「?」 next to a card's name: 24 px to see, 40 px to tap */
+.dv-q{position:relative;align-self:center;flex:none;width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:13px;font-weight:700;line-height:1;display:grid;place-items:center}
+.dv-q::after{content:"";position:absolute;inset:-8px}
+.dv-q:active{background:var(--sunk)}
+
+/* Claude's weekly report, above or under the 本周 table: its own block */
+.dv-wkr{padding:14px 16px;border-radius:var(--r,16px);background:var(--agent-soft,var(--accent-soft));display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.55}
+.dv-wkr p{margin:0}
+.dv-wkr .t{position:relative;display:block;width:100%;text-align:left;font-weight:700;font-size:15.5px;line-height:1.4;color:var(--ink);padding:2px 0}
+.dv-wkr .t::after{content:"";position:absolute;inset:-7px 0}
+.dv-wkr .goals{margin-top:2px}
+.dv-wkr .sub-h{margin-top:4px;color:var(--ink);opacity:.8}
+.dv-wkr .list{font-size:14px}
+.dv-wkr .link{align-self:flex-start;color:var(--agent,var(--accent))}
+.dv-say .who,.dv-wkr .who{display:flex;align-items:center;gap:7px;min-height:20px}
+.dv-say .ag-mark,.dv-wkr .ag-mark{flex:none}
+.dv-say .by,.dv-wkr .by{font-size:12.5px;font-weight:600;color:var(--agent,var(--accent));min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* range toggle */
+.dv-trend{margin-block:6px 10px;align-items:center}
+.dv-range{margin-left:auto;display:flex;gap:2px;background:var(--sunk);border-radius:var(--r-s,12px);padding:3px}
+.dv-range button{position:relative;min-height:36px;min-width:56px;padding:0 10px;border-radius:9px;font-size:13.5px;color:var(--muted);white-space:nowrap}
+.dv-range button::after{content:"";position:absolute;inset:-3px -1px}
+.dv-range button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+
+/* a card: big number and verdict, Claude's line, then numbers and charts */
+.dv-card .panel{padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0;border-radius:var(--r,16px);box-shadow:var(--shadow,none)}
+.dv-card .sec-h .link{font-size:13px;font-weight:500}
+.dv-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dv-big{font-family:var(--f-num);font-size:36px;font-weight:600;line-height:1;letter-spacing:.005em}
+.dv-big small{font-size:15px;color:var(--muted);font-weight:500;margin-left:4px;letter-spacing:0}
+.dv-top .tag{font-size:12px;padding:3px 9px}
+.dv-sub{font-size:12.5px;line-height:1.5;color:var(--muted);margin-top:-6px}
+.dv-kvs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px;padding-top:12px;border-top:1px solid var(--line)}
+.dv-kv{min-width:0}
+.dv-kv .k{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-kv .v{font-family:var(--f-num);font-size:19px;font-weight:600;line-height:1.25;overflow-wrap:anywhere}
+.dv-kv .v small{font-size:11.5px;color:var(--muted);font-weight:500;margin-left:2px}
+.dv-kv .s{font-size:11.5px;color:var(--muted);line-height:1.35}
+.dv-empty{font-size:13.5px;line-height:1.55;color:var(--muted)}
+.dv-ct{font-size:12.5px;font-weight:600;margin-bottom:-6px}
+.dv-ct small{font-weight:400;color:var(--muted)}
+.dv-warn{padding:8px 10px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-size:13px;line-height:1.5}
+.dv-from{align-self:flex-start;margin:0 0 -4px;font-size:12px;color:var(--muted);background:var(--sunk);padding:2px 9px;border-radius:999px}
+
+/* Claude's line (meta/insights): the agent colour says whose it is */
+.dv-say{display:flex;flex-direction:column;gap:3px;padding:10px 12px 11px;border-radius:var(--r-s,12px);background:var(--agent-soft,var(--accent-soft));font-size:14px;line-height:1.5}
+.dv-say p{margin:0}
+.dv-say .lv{margin-left:auto;flex:none;font-size:11.5px;font-weight:600;color:var(--muted)}
+.dv-say .lv::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;background:var(--muted);vertical-align:1px}
+.dv-say.good .lv::before{background:var(--good)}
+.dv-say.adjust .lv::before{background:var(--warn)}
+.dv-say .say{color:var(--ink)}
+.dv-say .it{display:flex;flex-direction:column;gap:2px}
+.dv-say .it + .it{margin-top:5px}
+.dv-say .kk{font-weight:700;margin-right:6px}
+.dv-say .it.dim :is(.say,.do){opacity:.6}
+.dv-say .do{font-weight:600}
+.dv-say .do::before{content:"→ ";color:var(--agent,var(--accent));font-weight:600}
+.dv-say .upd{font-size:12.5px;color:var(--muted)}
+.dv-say.dim{background:var(--sunk)}
+.dv-say.dim .say,.dv-say.dim .do{opacity:.6}
+.dv-say.dim .by{color:var(--muted)}
+
+/* charts */
+.dv-chart{position:relative}
+.dv-chart svg{display:block;width:100%;height:auto;overflow:visible;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
+.dv-chart svg:focus{outline:none}
+.dv-chart svg:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.dv-chart text{fill:var(--muted);font-size:10px;font-family:var(--f-num)}
+.dv-chart text.now{fill:var(--ink);font-weight:600}
+.dv-chart text.lbl,.dv-chart text.end{paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.dv-chart text.lbl{font-size:10px;font-family:var(--f-body)}
+.dv-chart text.end{fill:var(--ink);font-size:12px;font-weight:600}
+.dv-chart .gl{stroke:var(--line);stroke-width:1}
+.dv-chart .hit{fill:transparent}
+.dv-chart .m-col{fill:var(--c)}
+.dv-chart .m-col.part{opacity:.5}
+.dv-chart .m-col.off{opacity:.25}
+/* still going (this week, today): a light fill with a full-colour outline, readable in both themes */
+.dv-chart .m-col.now{fill-opacity:.35;stroke:var(--c);stroke-width:1.3}
+.dv-chart .m-col.ok{fill:var(--good)}
+.dv-chart .m-col.out{fill:var(--warn)}
+.dv-chart .m-col.ok.now{stroke:var(--good)}
+.dv-chart .m-col.out.now{stroke:var(--warn)}
+.dv-chart .hb{fill:var(--c);opacity:.18}
+.dv-chart .hs{stroke:var(--c);stroke-width:1.6}
+.dv-chart .m-line{fill:none;stroke:var(--c);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.dv-chart .m-dot{fill:var(--c);stroke:var(--surface);stroke-width:2}
+.dv-chart .m-raw{fill:var(--muted);stroke:var(--surface);stroke-width:1.5;opacity:.6}
+.dv-chart .m-base{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-linejoin:round}
+.dv-chart .m-tgt{fill:none;stroke:var(--ink);stroke-width:1.5;opacity:.7;stroke-linejoin:round}
+.dv-chart .m-tick{stroke:var(--ink);stroke-width:2;stroke-linecap:round;opacity:.75}
+.dv-chart .m-tick.b{stroke:var(--muted);opacity:1}
+.dv-chart .m-tgt.far{opacity:.45}
+.dv-chart .m-goal{stroke:var(--good);stroke-width:1.5}
+.dv-chart .m-zero{stroke:var(--muted);stroke-width:1}
+.dv-chart .m-band{fill:var(--good);opacity:.12}
+.dv-chart .m-bonus{fill:var(--accent);stroke:var(--surface);stroke-width:1.5}
+.dv-chart .m-xh{stroke:var(--muted);stroke-width:1}
+.dv-chart .m-hl{fill:var(--ink);opacity:.07}
+.dv-tip{position:absolute;bottom:calc(100% - 4px);z-index:6;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.45;padding:6px 9px;border-radius:8px;white-space:nowrap;transform:translateX(-50%);box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.dv-tip b{font-family:var(--f-num);font-size:14px;font-weight:600}
+.dv-tip .s{opacity:.75}
+
+/* #18: on a dark surface the light washes all but vanish */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .dv-chart .m-band{opacity:.16}
+  :root:not([data-theme="light"]) .dv-chart .m-col.now{fill-opacity:.3}
+  :root:not([data-theme="light"]) .dv-legend i.wash{opacity:.45}
+}
+:root[data-theme="dark"] .dv-chart .m-band{opacity:.16}
+:root[data-theme="dark"] .dv-chart .m-col.now{fill-opacity:.3}
+:root[data-theme="dark"] .dv-legend i.wash{opacity:.45}
+
+/* legend: the key mirrors the mark (square for columns, line for lines, dot for points, wash for bands) */
+.dv-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted)}
+.dv-legend span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.dv-legend i{display:inline-block;flex:none;background:var(--c);position:relative}
+.dv-legend i.sq{width:9px;height:9px;border-radius:2px}
+.dv-legend i.sq.off{opacity:.3}
+.dv-legend i.sq.now{background:transparent;box-shadow:inset 0 0 0 1.3px var(--c)}
+.dv-legend i.sq.now::after{content:"";position:absolute;inset:0;border-radius:2px;background:var(--c);opacity:.35}
+.dv-legend i.sq.hatch{background:repeating-linear-gradient(135deg,var(--c) 0 1.5px,transparent 1.5px 4px);box-shadow:inset 0 0 0 1px var(--c);opacity:.8}
+.dv-legend i.ln{width:14px;height:2px;border-radius:1px}
+.dv-legend i.dot{width:8px;height:8px;border-radius:50%}
+.dv-legend i.dot.ring{background:transparent;border:1.5px dashed var(--c);width:10px;height:10px}
+.dv-legend i.wash{width:12px;height:9px;border-radius:2px;opacity:.25}
+
+/* 训练 over 7 days: one cell a day */
+.dv-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.dv-dd{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.dv-dd .w{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.dv-dd.now .w{color:var(--ink);font-weight:600}
+.dv-dd .m{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--sunk);font-family:var(--f-num);font-size:16px;font-weight:600;line-height:1}
+.dv-dd.on .m{background:var(--plate-red);color:var(--surface)}
+.dv-dd.plan .m{background:none;border:1.5px dashed var(--plate-red);color:var(--plate-red)}
+.dv-dd .n{font-family:var(--f-num);font-size:11.5px;color:var(--muted)}
+
+/* 主要动作 */
+.dv-card .sub-h{margin:2px 0 -4px}
+.dv-exs{display:flex;flex-direction:column}
+.dv-ex{display:grid;grid-template-columns:minmax(0,1fr) 64px 62px;align-items:center;gap:10px;padding:8px 0;text-align:left;border-top:1px solid var(--line);min-height:48px}
+.dv-ex:first-child{border-top:0}
+.dv-ex .nm{display:flex;flex-direction:column;min-width:0}
+.dv-ex .nm b{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dv-ex .nm small{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dv-ex .ch{font-family:var(--f-num);font-size:15px;font-weight:600;text-align:right;color:var(--muted);white-space:nowrap}
+.dv-ex .ch.up{color:var(--ink)}
+.dv-ex .ch small{display:block;font-family:var(--f-body);font-size:11px;font-weight:400;color:var(--muted)}
+.dv-spark{width:64px;height:22px;display:block}
+.dv-spark path{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.dv-spark path.up{stroke:var(--plate-blue)}
+.dv-spark circle{fill:var(--ink)}
+@media (max-width:359px){.dv-ex{grid-template-columns:minmax(0,1fr) 44px 56px;gap:8px}.dv-spark{width:44px;height:16px}}
+.dv-card > .panel > .link{align-self:flex-start;position:relative}
+.dv-card > .panel > .link::after{content:"";position:absolute;inset:-8px -6px}
+
+/* sheets: 这是什么, 动作进步 */
+.dv-info{display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.6}
+.dv-info h4{margin:8px 0 0;font-size:13.5px}
+.dv-info h4:first-child{margin-top:0}
+.dv-info p{margin:0}
+.dv-info ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px}
+.dv-info b{font-family:var(--f-num);font-size:15px}
+.dv-info .dv-ih{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line);font-size:15px}
+.dv-exsheet{display:flex;flex-direction:column;gap:12px}
+.dv-pick select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:var(--r-s,12px);background:var(--surface);padding:0 10px;font-size:15px}
+.dv-expanel{padding:16px;display:flex;flex-direction:column;gap:10px;border-radius:var(--r,16px)}
+.dv-expanel .dv-kvs{border-top:0;padding-top:0}
+.dv-tbl{overflow-x:auto}
+.dv-tbl table{width:100%;border-collapse:collapse;font-size:13px}
+.dv-tbl th{font-size:12px;color:var(--muted);font-weight:600;text-align:left;padding:4px 8px 4px 0}
+.dv-tbl td{padding:6px 8px 6px 0;border-top:1px solid var(--line);vertical-align:top}
+.dv-tbl td:first-child{font-family:var(--f-num);white-space:nowrap;color:var(--muted)}
+.dv-tbl td b{display:block;font-weight:600;white-space:nowrap}
+.dv-tbl td small{display:block;color:var(--muted);font-size:11.5px;font-family:var(--f-num)}
+.dv-tbl .n{text-align:right;font-family:var(--f-num);white-space:nowrap}
+
+/* 围度和体脂: the goal's line, then one row a measure (name and dates · trend · latest and the last change) */
+.dv-btn{align-self:flex-start}
+.dv-focus{margin:0;font-size:13.5px;line-height:1.55;color:var(--muted)}
+.dv-focus b{color:var(--ink);font-weight:600}
+.dv-ms{display:flex;flex-direction:column}
+.dv-m{display:grid;grid-template-columns:minmax(0,1fr) 64px 80px;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);min-height:50px}
+.dv-m:first-child{border-top:0;padding-top:0}
+.dv-m .nm{display:flex;flex-direction:column;min-width:0;gap:1px}
+.dv-m .nm b{display:flex;align-items:center;gap:6px;font-weight:600;font-size:14px;white-space:nowrap}
+.dv-m .nm b i{font-style:normal;font-size:11px;font-weight:600;line-height:1.6;padding:0 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.dv-m .nm small{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dv-m .val{display:flex;flex-direction:column;align-items:flex-end;text-align:right;min-width:0}
+.dv-m .val b{font-family:var(--f-num);font-size:19px;font-weight:600;line-height:1.2;white-space:nowrap}
+.dv-m .val b small{font-family:var(--f-body);font-size:11.5px;font-weight:500;color:var(--muted);margin-left:2px}
+.dv-m .ch{font-family:var(--f-num);font-size:13px;line-height:1.3;color:var(--muted);white-space:nowrap}
+.dv-m .ch.good{color:var(--good);font-weight:600}
+.dv-m .ch.bad{color:var(--warn);font-weight:600}
+@media (max-width:359px){.dv-m{grid-template-columns:minmax(0,1fr) 44px 70px;gap:8px}.dv-m .dv-spark{width:44px;height:16px}}
+
+/* 身材照: the view toggle, two dated columns, Claude's comparison */
+.dv-remind{margin:0;padding:8px 10px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-size:13px;line-height:1.5}
+.dv-pv{flex-wrap:nowrap}
+.dv-pv button{flex:1 1 0;min-width:0;min-height:40px}
+.dv-pv button:disabled{opacity:.4}
+.dv-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.dv-pc{display:flex;flex-direction:column;gap:6px;min-width:0}
+.dv-pdate{display:block;min-width:0}
+.dv-pdate select{padding:0 26px 0 10px;background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;font-family:var(--f-body);font-weight:600}
+.dv-pdate.one{min-height:44px;display:flex;align-items:center;padding-inline:10px;font-size:15px;font-weight:600;color:var(--muted);border-radius:var(--r-s);background:var(--sunk)}
+.dv-ph{display:block;width:100%;aspect-ratio:3/4;padding:0;border-radius:var(--r-s);overflow:hidden;background:var(--sunk)}
+.dv-ph img{display:block;width:100%;height:100%;object-fit:contain}
+.dv-ph.none,.dv-ph.next{display:grid;place-items:center;padding:14px;text-align:center;font-size:12.5px;line-height:1.55;color:var(--muted)}
+.dv-ph.next{background:none;border:1.5px dashed var(--line)}
+.dv-chg{margin:2px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+.dv-wait{display:flex;align-items:center;gap:8px}
+.dv-wait .ag-mark{flex:none}
+
+
+/* a photo, big (when app.js has no viewer of its own) */
+.dv-lb{position:fixed;inset:0;z-index:45;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.92)}
+.dv-lb[hidden]{display:none}
+.dv-lb img{width:100%;height:100%;object-fit:contain}
+.dv-lb-x{position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);right:8px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:26px;line-height:1}
+
+/* the 报告 card's 阶段 badge (a phase summary) */
+.kind.phase{background:var(--good-soft);color:var(--good)}
+
+/* 训练: the two ways into the 训练 tab's pages */
+.dv-links{display:flex;gap:18px}
+.dv-links .link{position:relative}
+
+/* 动作详情: the range chips over the chart, 下次怎么练 (the 今日 训练单's prescription), the whole table */
+.dv-exr{flex-wrap:nowrap;gap:4px;margin-bottom:-4px}
+.dv-exr button{flex:1 1 0;min-width:0;min-height:40px;padding:4px 2px;font-size:13px;white-space:nowrap}
+.dv-next{display:flex;flex-direction:column;gap:3px;padding:10px 12px 11px;border-radius:var(--r-s,12px);background:var(--sunk);line-height:1.45}
+.dv-next p{margin:0}
+.dv-next .who{display:flex;align-items:center;gap:8px;min-height:20px}
+.dv-next .by{font-size:12.5px;font-weight:600;color:var(--muted)}
+.dv-next .src{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.dv-next.claude{background:var(--agent-soft,var(--accent-soft))}
+.dv-next.claude .src{color:var(--agent,var(--accent))}
+.dv-next.claude .src .ag-mark{width:14px;height:14px;border-radius:4px}
+.dv-next.claude .src .ag-mark::before{inset:3px}
+.dv-next.deload .src{color:var(--warn)}
+.dv-next .dv-nx{font-family:var(--f-num);font-size:20px;font-weight:600;color:var(--ink)}
+.dv-next .why{font-size:13px;color:var(--ink)}
+.dv-tbl td.none{text-align:center;color:var(--muted);padding:14px 0}
+.dv-exmore{align-self:center;display:block;margin:4px auto 0;min-height:40px}
+
+/* 身体变化: the switch (体重 / 围度和体脂 / 身材照), three equal cells that fit 320 px; a dot on one that needs a look */
+.dv-sub{flex-wrap:nowrap;gap:4px}
+.dv-sub button{position:relative;flex:1 1 0;min-width:0;min-height:40px;padding:4px 2px;font-size:13.5px;white-space:nowrap}
+.dv-sub button.flag::before{content:"";position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--warn)}
+/* 每周变化 under the weight chart */
+.dv-rate{display:flex;flex-direction:column;gap:3px;padding-top:12px;border-top:1px solid var(--line)}
+.dv-rate .r1{display:flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap}
+.dv-rate .k{font-size:13px;font-weight:600}
+.dv-rate .v{font-family:var(--f-num);font-size:20px;font-weight:600;line-height:1.2}
+.dv-rate .v small{font-size:12px;color:var(--muted);font-weight:500;margin-left:1px}
+.dv-rate .kg{font-family:var(--f-num);font-size:12.5px;color:var(--muted)}
+.dv-rate .tag{align-self:center}
+.dv-rate .r2{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.dv-rate.none{margin:0;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;line-height:1.5;color:var(--muted)}
+.dv-rate.none b{color:var(--ink);font-weight:600;margin-right:6px}
+/* 恢复 under the sleep chart: resting HR, HRV, the deviation days */
+.dv-rec{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+.dv-rec .dv-ct{margin:0;display:flex;align-items:center;gap:8px}
+.dv-rec .dv-ct .tag{font-size:11.5px;padding:1px 8px}
+.dv-rec .dv-kvs{border-top:0;padding-top:0}
+
+/* 报告: the kind chips, one row a report (kind · title and its first line · date) */
+.dv-rf{margin-bottom:10px}
+.dv-rf .chip{min-height:36px;position:relative}
+.dv-rf .chip::after{content:"";position:absolute;inset:-3px -2px}
+.dv-card .panel.dv-reps{list-style:none;margin:0;padding:0;display:block;overflow:hidden}
+.dv-reps li + li{border-top:1px solid var(--line)}
+.dv-rep{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;min-height:48px;padding:8px 14px;text-align:left}
+.dv-rep:active{background:var(--sunk)}
+.dv-rep .m{min-width:0;font-weight:600;font-size:14.5px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dv-rep .d{font-family:var(--f-num);color:var(--muted);font-size:14px;white-space:nowrap}
+.dv-rmore{display:inline-flex;align-items:center;min-height:44px;margin-top:4px}
+.dv-rnone{padding:6px 2px}
+
+/* 抽象 style (html[data-style="abstract"]) for this page's own pieces; the shared ones (.panel, .seg, .chip, .kind,
+   .dv-say, .dv-wkr …) are styled in abstract.css */
+html[data-style="abstract"] .dv-q{border:2px solid var(--stroke);color:var(--ink);font-weight:800;box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .dv-q:active{translate:1px 1px;box-shadow:none}
+html[data-style="abstract"] .dv-wkr .t{font-weight:800}
+html[data-style="abstract"] .dv-wkr .link{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+html[data-style="abstract"] .dv-say .kk{font-weight:800}
+html[data-style="abstract"] .dv-sub button{font-weight:700}
+html[data-style="abstract"] .dv-sub button.flag::before{width:8px;height:8px;top:4px;right:4px;box-shadow:0 0 0 1.5px var(--stroke)}
+html[data-style="abstract"] :is(.dv-rate,.dv-rate.none,.dv-rec){border-top:2px dashed var(--sep)}
+html[data-style="abstract"] .dv-rec .dv-kvs{border-top:0}
+html[data-style="abstract"] .dv-rate .k,html[data-style="abstract"] .dv-rate.none b{font-weight:800}
+html[data-style="abstract"] .dv-rate .v{font-weight:700;font-size:22px}
+html[data-style="abstract"] .dv-rate .r2{color:var(--ink);opacity:.75}
+html[data-style="abstract"] .dv-reps li + li{border-top-color:var(--sep)}
+html[data-style="abstract"] .dv-rep .m{font-weight:800}
+html[data-style="abstract"] .dv-rep .d{color:var(--ink);font-weight:700}
+html[data-style="abstract"] .dv-info .dv-ih{border-top:2px dashed var(--sep);font-weight:800}

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>登录 · 薄肌研究所</title>
+<meta name="theme-color" content="#FFF6D9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A0A0B" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="薄肌研究所">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<!-- login.js runs before the first paint (no defer): it sets <html data-style / data-theme / data-mode> -->
+<script src="/login.js"></script>
+<style>
+/* Two looks, like the app: 正经 (no data-style) and 互联网抽象风 (data-style="abstract", the default; colours from
+   abstract.css). Light and dark each; data-theme (lsj-theme) overrides the system. This page doesn't load app.css. */
+:root{color-scheme:light;--bg:#F1F3F5;--surface:#FFFFFF;--ink:#121820;--muted:#5A6573;--line:#D8DEE5;--accent:#1D4ED8;--accent-ink:#FFFFFF;--accent-soft:#E2E9FB;--danger:#C0322A;
+  --plate-red:#D2372A;--plate-blue:#1D4ED8;--plate-yellow:#C99500;--plate-green:#16885A;
+  --bw:1px;--stroke:var(--line);--card-bg:transparent;--card-bd:transparent;--card-shadow:none;--card-pad:0;
+  --btn-bd:transparent;--btn-shadow:none;--dots:transparent;--hl:transparent;--ok-bg:var(--accent-soft);--ok-ink:var(--accent);--ok-bd:transparent;--ok-shadow:none}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0E1217;--surface:#161B22;--ink:#E6EAF0;--muted:#8D98A7;--line:#2A323D;--accent:#6A93FF;--accent-ink:#0B1020;--accent-soft:#1D2A4A;--danger:#FF7468;
+  --plate-red:#FF6F60;--plate-blue:#6A93FF;--plate-yellow:#EBC03A;--plate-green:#3CC883}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0E1217;--surface:#161B22;--ink:#E6EAF0;--muted:#8D98A7;--line:#2A323D;--accent:#6A93FF;--accent-ink:#0B1020;--accent-soft:#1D2A4A;--danger:#FF7468;
+  --plate-red:#FF6F60;--plate-blue:#6A93FF;--plate-yellow:#EBC03A;--plate-green:#3CC883}
+html[data-style="abstract"]{color-scheme:light;--bg:#FFF6D9;--dots:rgba(17,17,17,.075);--surface:#FFFFFF;--ink:#111111;--muted:#55514A;--line:#DCD2B6;
+  --accent:#7B2FF7;--accent-ink:#FFFFFF;--accent-soft:#F0E6FF;--danger:#D0182B;--hl:#FFE14D;
+  --plate-red:#E0281D;--plate-blue:#2E5BFF;--plate-yellow:#F2B400;--plate-green:#12A150;
+  --bw:2px;--stroke:#111111;--card-bg:#FFFFFF;--card-bd:#111111;--card-shadow:4px 4px 0 #111111;--card-pad:22px 18px 18px;
+  --btn-bd:#111111;--btn-shadow:3px 3px 0 #111111;--ok-bg:#C3FF3A;--ok-ink:#111111;--ok-bd:#111111;--ok-shadow:2px 2px 0 #111111}
+@media (prefers-color-scheme: dark){html[data-style="abstract"]:not([data-theme="light"]){color-scheme:dark;--bg:#0A0A0B;--dots:rgba(255,255,255,.07);--surface:#1B1B1E;--ink:#F7F5EE;--muted:#ABA79E;--line:#3A3A40;
+  --accent:#B58CFF;--accent-ink:#0A0A0B;--accent-soft:#2D1F4D;--danger:#FF6B6B;--hl:#5B2BC4;
+  --plate-red:#FF5A4E;--plate-blue:#6E8CFF;--plate-yellow:#FFD23F;--plate-green:#3DDC84;
+  --stroke:#EDEBE4;--card-bg:#1B1B1E;--card-bd:#EDEBE4;--card-shadow:4px 4px 0 #9B6BFF;--btn-bd:#EDEBE4;--btn-shadow:3px 3px 0 #9B6BFF;
+  --ok-bg:#C3FF3A;--ok-ink:#111111;--ok-bd:#EDEBE4;--ok-shadow:2px 2px 0 #9B6BFF}}
+html[data-style="abstract"][data-theme="dark"]{color-scheme:dark;--bg:#0A0A0B;--dots:rgba(255,255,255,.07);--surface:#1B1B1E;--ink:#F7F5EE;--muted:#ABA79E;--line:#3A3A40;
+  --accent:#B58CFF;--accent-ink:#0A0A0B;--accent-soft:#2D1F4D;--danger:#FF6B6B;--hl:#5B2BC4;
+  --plate-red:#FF5A4E;--plate-blue:#6E8CFF;--plate-yellow:#FFD23F;--plate-green:#3DDC84;
+  --stroke:#EDEBE4;--card-bg:#1B1B1E;--card-bd:#EDEBE4;--card-shadow:4px 4px 0 #9B6BFF;--btn-bd:#EDEBE4;--btn-shadow:3px 3px 0 #9B6BFF;
+  --ok-bg:#C3FF3A;--ok-ink:#111111;--ok-bd:#EDEBE4;--ok-shadow:2px 2px 0 #9B6BFF}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;min-height:100dvh;background-color:var(--bg);background-image:radial-gradient(var(--dots) 1.2px,transparent 1.7px);background-size:18px 18px;color:var(--ink);
+  font:15px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",sans-serif;display:grid;place-items:center;
+  padding:max(24px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+main{width:100%;max-width:360px;background:var(--card-bg);border:2px solid var(--card-bd);border-radius:16px;box-shadow:var(--card-shadow);padding:var(--card-pad)}
+form{display:flex;flex-direction:column;gap:14px}
+[hidden]{display:none!important}
+html[data-mode="join"] #f,html:not([data-mode="join"]) .join{display:none!important}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:22px;letter-spacing:.04em;margin-bottom:14px}
+.brand b{font-weight:inherit}
+.mark{width:40px;height:40px;flex:none;display:block}
+.tag{display:none}
+h1{margin:0;font-size:18px;line-height:1.35}
+p{margin:0;color:var(--muted);font-size:13.5px}
+.field{display:flex;flex-direction:column;gap:6px}
+label{font-size:13px;font-weight:600;color:var(--muted)}
+.hint{font-size:12.5px}
+input{width:100%;font:inherit;font-size:16px;color:inherit;background:var(--surface);border:var(--bw) solid var(--stroke);border-radius:10px;padding:10px 12px;min-height:46px}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+#code{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase}
+button{height:46px;border:2px solid var(--btn-bd);border-radius:11px;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:600;font-size:16px;cursor:pointer;box-shadow:var(--btn-shadow)}
+button:disabled{opacity:.6}
+.err{color:var(--danger);font-size:13.5px;min-height:1.5em}
+.err:empty{min-height:0}
+a{color:var(--accent);font-weight:600;text-underline-offset:3px}
+.alt{text-align:center;font-size:14px}
+.ok{align-self:flex-start;max-width:100%;background:var(--ok-bg);color:var(--ok-ink);border:2px solid var(--ok-bd);box-shadow:var(--ok-shadow);border-radius:9px;padding:5px 10px;font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
+.fine{font-size:12.5px}
+/* 抽象风: a sticker card with a hard shadow, a highlighter under the name, a neon tag, chunky type */
+html[data-style="abstract"] .brand{font-size:26px;font-weight:800;letter-spacing:.02em}
+html[data-style="abstract"] .brand b{padding:0 2px;background:linear-gradient(transparent 58%,var(--hl) 58%,var(--hl) 90%,transparent 90%);-webkit-text-stroke:.35px currentColor}
+html[data-style="abstract"] .tag{display:inline-block;margin-left:auto;font-size:12px;font-weight:800;letter-spacing:0;line-height:20px;padding:1px 8px;color:#111111;background:#C3FF3A;border:1.5px solid var(--stroke);border-radius:6px;box-shadow:1.5px 1.5px 0 var(--stroke);rotate:-3deg;white-space:nowrap}
+html[data-style="abstract"] h1{font-size:20px;font-weight:800;-webkit-text-stroke:.3px currentColor}
+html[data-style="abstract"] label{color:var(--ink);font-weight:800}
+html[data-style="abstract"] input:focus{box-shadow:none;outline:3px solid var(--accent);outline-offset:1px;border-color:var(--stroke)}
+html[data-style="abstract"] button{font-weight:800;transition:translate .08s ease-out,box-shadow .08s ease-out}
+html[data-style="abstract"] button:active:not(:disabled){translate:2px 2px;box-shadow:0 0 0 transparent}
+html[data-style="abstract"] button:disabled{box-shadow:none}
+html[data-style="abstract"] a{font-weight:800;text-decoration-thickness:2px}
+html[data-style="abstract"] .ok{rotate:-1deg;font-weight:800}
+html[data-style="abstract"] .err{font-weight:700}
+@media (prefers-reduced-motion: reduce){html[data-style="abstract"] button{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <div class="brand"><img class="mark" src="/icons/favicon.svg" alt="" width="40" height="40"><b>薄肌研究所</b><span class="tag">你的 AI 私教</span></div>
+
+  <form id="f">
+    <p>用你的用户名和密码登录。登录一次后，这台手机会保持登录一年。</p>
+    <div class="field"><label for="un">用户名</label><input id="un" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus></div>
+    <div class="field"><label for="pw">密码</label><input id="pw" type="password" autocomplete="current-password" required></div>
+    <button id="go" type="submit">登录</button>
+    <div class="err" id="err" role="alert"></div>
+    <p class="alt">有邀请码？<a href="/join">注册</a></p>
+  </form>
+
+  <form id="j1" class="join" novalidate>
+    <h1>用邀请码注册</h1>
+    <p>邀请码是朋友发给你的 12 位字母和数字。从邀请链接打开的话，已经帮你填好了。</p>
+    <div class="field"><label for="code">邀请码</label><input id="code" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="20" placeholder="ABCD-EFGH-JKMN" required></div>
+    <button id="j1-go" type="submit">下一步</button>
+    <div class="err" id="j1-err" role="alert"></div>
+    <p class="alt">已经有账号？<a href="/login">登录</a></p>
+  </form>
+
+  <form id="j2" class="join" novalidate hidden>
+    <div class="ok" id="j2-ok">邀请码可以用</div>
+    <h1>设一个账号</h1>
+    <div class="field"><label for="ju">用户名</label><input id="ju" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="32" required>
+      <p class="hint">登录用：2–32 位小写字母、数字或 _ . -，之后改不了</p></div>
+    <div class="field"><label for="jn">怎么称呼你</label><input id="jn" type="text" autocomplete="nickname" maxlength="40" placeholder="名字或昵称">
+      <p class="hint">之后可以在「我的」里改</p></div>
+    <div class="field"><label for="jp">密码</label><input id="jp" type="password" autocomplete="new-password" required>
+      <p class="hint">至少 8 位</p></div>
+    <div class="field"><label for="jp2">再输一遍密码</label><input id="jp2" type="password" autocomplete="new-password" required></div>
+    <p class="fine">注册前建议看看：<a href="/privacy">你的数据怎么处理</a>（记录和照片存在哪、谁能看到）</p>
+    <button id="j2-go" type="submit">注册并登录</button>
+    <div class="err" id="j2-err" role="alert"></div>
+    <p class="alt"><a href="/join" id="j2-back">换一个邀请码</a></p>
+  </form>
+</main>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- launchd job for Claude's scheduled processing (scripts/auto-review.sh), on the Mac that runs Claude Code.
+     Replace /PATH/TO/lianshiji and /Users/YOU, keep LSJ_AUTO_TIMES in step with StartCalendarInterval, then:
+       cp deploy/auto-review.plist.example ~/Library/LaunchAgents/com.lianshiji.auto-review.plist   (and edit it)
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.lianshiji.auto-review.plist
+     A slot missed while the Mac slept runs when it wakes; a slot missed while it was off is skipped.
+     Stop it: launchctl bootout gui/$(id -u)/com.lianshiji.auto-review -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.lianshiji.auto-review</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>/PATH/TO/lianshiji/scripts/auto-review.sh</string></array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/Users/YOU/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    <key>LSJ_AUTO_TIMES</key><string>15:00 23:30</string>
+  </dict>
+  <key>StandardOutPath</key><string>/Users/YOU/Library/Logs/lianshiji/launchd.log</string>
+  <key>StandardErrorPath</key><string>/Users/YOU/Library/Logs/lianshiji/launchd.log</string>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>

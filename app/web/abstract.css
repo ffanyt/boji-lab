@@ -1,0 +1,811 @@
+/* 互联网抽象风 (data-style="abstract" on <html>): a second skin over app.css / stats.css / claude.css.
+   Paper-yellow ground with a dot grid, white cards with a 2px black outline and a hard offset shadow (no blur),
+   bright purple for the main actions, neon green with black type for everything from Claude, yellow / pink / cyan
+   stickers (some tilted a degree or two). Dark: black ground, dark grey cards with a light outline, purple (cards) and
+   neon (Claude) offset shadows.
+   Every rule here starts with html[data-style="abstract"], so without the attribute the page is the plain style.
+   Load it after the other three stylesheets. Layout is untouched: same grids, same tap sizes, no sideways scroll.
+   Status colours keep their meaning (good = green, warn = orange, danger = red); text is ≥ 4.5:1 on its ground in both
+   themes (neon only ever carries black type).
+   Motion: only press feedback (a button moves 2px into its shadow, like pressing a sticker) and a small spring when a
+   chip / set tick is switched on; none of it under prefers-reduced-motion.
+   voice.js's lines use a class of their own, styled at the end: .hb-q (the 五件套 sheet). */
+
+/* ---------- tokens: light ---------- */
+html[data-style="abstract"]{
+  color-scheme:light;
+  --bg:#FFF6D9; --dots:rgba(17,17,17,.075); --surface:#FFFFFF; --sunk:#F5EED8; --ink:#111111; --muted:#55514A;
+  --line:#DCD2B6; --sep:#E8E0C8;
+  --stroke:#111111;            /* the sticker outline */
+  --hard:#111111;              /* offset shadow of cards and buttons */
+  --hard-ag:#111111;           /* offset shadow of Claude's cards */
+  --accent:#7B2FF7; --accent-ink:#FFFFFF; --accent-soft:#F0E6FF;
+  --neon:#C3FF3A; --neon-ink:#111111;
+  --pop-yellow:#FFE14D; --pop-pink:#FF8AD4; --pop-cyan:#5CE1F2; --pop-ink:#111111;
+  --hl:#FFE14D;                /* highlighter under big titles */
+  --hl-ag:#D9FF7A;             /* highlighter under Claude's suggestions */
+  --agent:#3F6A00; --agent-soft:#D9FF7A; --agent-ink:#FFFFFF;
+  --ag-card:#C3FF3A;           /* Claude's big cards */
+  --good:#007346; --good-soft:#C9F5DD; --good-ink:#FFFFFF;
+  --warn:#A84200; --warn-soft:#FFE3C7; --danger:#D0182B; --water:#0A84C6;
+  --plate-red:#E0281D; --plate-blue:#2E5BFF; --plate-yellow:#F2B400; --plate-green:#12A150;
+  --sl-deep:#4B2BD6; --sl-core:#3D7BFF; --sl-rem:#4FD8F5; --sl-awake:#FF7A1A;
+  --card-bd:#111111; --bar-bg:rgba(255,246,217,.92); --scrim:rgba(17,17,17,.5);
+  --r:14px; --r-s:10px;
+  --shadow:4px 4px 0 #111111; --shadow-s:3px 3px 0 #111111; --shadow-xs:2px 2px 0 #111111;
+}
+/* ---------- tokens: dark (system dark without a pick, or 外观 = 深色) ---------- */
+@media (prefers-color-scheme: dark){html[data-style="abstract"]:not([data-theme="light"]){
+  color-scheme:dark;
+  --bg:#0A0A0B; --dots:rgba(255,255,255,.07); --surface:#1B1B1E; --sunk:#26262A; --ink:#F7F5EE; --muted:#ABA79E;
+  --line:#3A3A40; --sep:#2E2E33;
+  --stroke:#EDEBE4; --hard:#9B6BFF; --hard-ag:#C3FF3A;
+  --accent:#B58CFF; --accent-ink:#0A0A0B; --accent-soft:#2D1F4D;
+  --neon:#C3FF3A; --neon-ink:#111111;
+  --pop-yellow:#FFE14D; --pop-pink:#FF8AD4; --pop-cyan:#5CE1F2; --pop-ink:#111111;
+  --hl:#5B2BC4; --hl-ag:rgba(195,255,58,.24);
+  --agent:#C3FF3A; --agent-soft:#222B0E; --agent-ink:#111111;
+  --ag-card:#1D240C;
+  --good:#3DDC97; --good-soft:#0E3324; --good-ink:#0A0A0B;
+  --warn:#FFA64D; --warn-soft:#3B2410; --danger:#FF6B6B; --water:#4CC9F0;
+  --plate-red:#FF5A4E; --plate-blue:#6E8CFF; --plate-yellow:#FFD23F; --plate-green:#3DDC84;
+  --sl-deep:#9580FF; --sl-core:#4C86F0; --sl-rem:#86DDFB; --sl-awake:#FF9A4A;
+  --card-bd:#EDEBE4; --bar-bg:rgba(10,10,11,.9); --scrim:rgba(0,0,0,.65);
+  --shadow:4px 4px 0 #9B6BFF; --shadow-s:3px 3px 0 #9B6BFF; --shadow-xs:2px 2px 0 #9B6BFF;
+}}
+html[data-style="abstract"][data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0A0A0B; --dots:rgba(255,255,255,.07); --surface:#1B1B1E; --sunk:#26262A; --ink:#F7F5EE; --muted:#ABA79E;
+  --line:#3A3A40; --sep:#2E2E33;
+  --stroke:#EDEBE4; --hard:#9B6BFF; --hard-ag:#C3FF3A;
+  --accent:#B58CFF; --accent-ink:#0A0A0B; --accent-soft:#2D1F4D;
+  --neon:#C3FF3A; --neon-ink:#111111;
+  --pop-yellow:#FFE14D; --pop-pink:#FF8AD4; --pop-cyan:#5CE1F2; --pop-ink:#111111;
+  --hl:#5B2BC4; --hl-ag:rgba(195,255,58,.24);
+  --agent:#C3FF3A; --agent-soft:#222B0E; --agent-ink:#111111;
+  --ag-card:#1D240C;
+  --good:#3DDC97; --good-soft:#0E3324; --good-ink:#0A0A0B;
+  --warn:#FFA64D; --warn-soft:#3B2410; --danger:#FF6B6B; --water:#4CC9F0;
+  --plate-red:#FF5A4E; --plate-blue:#6E8CFF; --plate-yellow:#FFD23F; --plate-green:#3DDC84;
+  --sl-deep:#9580FF; --sl-core:#4C86F0; --sl-rem:#86DDFB; --sl-awake:#FF9A4A;
+  --card-bd:#EDEBE4; --bar-bg:rgba(10,10,11,.9); --scrim:rgba(0,0,0,.65);
+  --shadow:4px 4px 0 #9B6BFF; --shadow-s:3px 3px 0 #9B6BFF; --shadow-xs:2px 2px 0 #9B6BFF;
+}
+
+/* ---------- ground, type ---------- */
+html[data-style="abstract"] body{background-color:var(--bg);background-image:radial-gradient(var(--dots) 1.2px,transparent 1.7px);background-size:18px 18px}
+html[data-style="abstract"] .num{font-weight:600}
+html[data-style="abstract"] :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+/* PingFang stops at Semibold: a hairline stroke makes the big titles read as heavy as 800 */
+html[data-style="abstract"] :is(.top-t,.sec-h h2,.plan-head h2,.tr-title,.cl-prop h3,.sheet-h h3,.ag-t,.rep-t){font-weight:800;-webkit-text-stroke:.35px currentColor}
+
+/* ---------- title bar ---------- */
+html[data-style="abstract"] .top{-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+html[data-style="abstract"] .top-t{font-size:24px;letter-spacing:.02em;padding-inline:2px;background:linear-gradient(transparent 58%,var(--hl) 58%,var(--hl) 90%,transparent 90%)}
+html[data-style="abstract"] .top-t svg{color:var(--ink);stroke-width:2.6}
+html[data-style="abstract"] .pill-btn{border:2px solid var(--stroke);background:var(--pop-yellow);color:var(--pop-ink);font-weight:800;box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .banner{border:2px solid var(--stroke);font-weight:600}
+
+/* ---------- sections: big heavy titles, a sticker next to them ---------- */
+html[data-style="abstract"] .sec-h{min-height:30px;margin-bottom:10px}
+html[data-style="abstract"] .sec-h h2{font-size:20px;letter-spacing:.02em}
+html[data-style="abstract"] .sec-h .count{align-self:center;font-family:var(--f-num);font-size:13.5px;font-weight:700;line-height:20px;color:var(--pop-ink);background:var(--pop-yellow);border:1.5px solid var(--stroke);border-radius:6px;padding:0 7px;box-shadow:1.5px 1.5px 0 var(--stroke)}
+html[data-style="abstract"] .sec:nth-of-type(3n+1) .sec-h .count{rotate:-2deg}
+html[data-style="abstract"] .sec:nth-of-type(3n+2) .sec-h .count{background:var(--pop-pink)}
+html[data-style="abstract"] .sec:nth-of-type(3n) .sec-h .count{background:var(--pop-cyan);rotate:1.5deg}
+html[data-style="abstract"] .sub-h{color:var(--ink);font-weight:800}
+
+/* ---------- cards ---------- */
+html[data-style="abstract"] :is(.panel,.report,.dv-week,.dv-expanel,.cl-fds){border:2px solid var(--stroke);box-shadow:var(--shadow);border-radius:var(--r)}
+html[data-style="abstract"] .dv-card .panel{box-shadow:var(--shadow)}
+html[data-style="abstract"] .rows > * + *,html[data-style="abstract"] :is(.rx,.wr-r,.pex,.qk,.need,.hl-i,.cmp-list li,.dm-sel,.act-row,.cl-log-r,.cl-opt,.cl-fd) + *{border-top-color:var(--sep)}
+/* the boxes inside a sheet: same outline, a smaller shadow */
+html[data-style="abstract"] :is(.review,.ex,.xex,.cmp,.mine-det,.kn,.pwbox,fieldset,.tgls,.keys,.dm-list,.ask){border:2px solid var(--stroke);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] :is(.tgls .tgl + .tgl,.keyrow + .keyrow,.dm-row + .dm-row){border-top-color:var(--sep)}
+
+/* ---------- buttons, links, inputs ---------- */
+html[data-style="abstract"] .btn{border:2px solid var(--stroke);font-weight:800;transition:translate .08s ease-out,box-shadow .08s ease-out}
+html[data-style="abstract"] .btn.primary{background:var(--accent);color:var(--accent-ink);box-shadow:var(--shadow-s)}
+html[data-style="abstract"] .btn.ghost{background:var(--surface);border-color:var(--stroke);box-shadow:var(--shadow-s)}
+html[data-style="abstract"] .btn.sm{box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .btn.confirm{background:var(--danger);color:#fff;border-color:var(--stroke)}
+html[data-style="abstract"] .btn.danger{background:var(--surface);color:var(--danger)}
+html[data-style="abstract"] .btn:active:not(:disabled){opacity:1;translate:2px 2px;box-shadow:0 0 0 var(--hard)}
+html[data-style="abstract"] .btn:disabled{box-shadow:none}
+html[data-style="abstract"] .link{font-weight:800;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+html[data-style="abstract"] :is(.link-t,.cl-go,.dsec summary,.steps-det summary,.tbl-det summary,.cl-add){font-weight:800}
+html[data-style="abstract"] .icon-btn{color:var(--ink)}
+html[data-style="abstract"] :is(input[type=text],input[type=number],input[type=date],input[type=time],input[type=password],textarea,select){border:2px solid var(--stroke);background-color:var(--surface)}
+html[data-style="abstract"] :is(input,textarea,select):focus{border-color:var(--accent);box-shadow:3px 3px 0 var(--accent)}
+html[data-style="abstract"] input[aria-invalid="true"]{border-color:var(--danger)}
+html[data-style="abstract"] :is(.field > label,.lbl){color:var(--ink);font-weight:800}
+html[data-style="abstract"] legend{font-weight:800}
+
+/* switches: an outlined track, a white knob with an outline */
+html[data-style="abstract"] input.sw{background:var(--sunk);border:2px solid var(--stroke)}
+html[data-style="abstract"] input.sw::after{top:1px;left:1px;width:22px;height:22px;background:#fff;border:2px solid #111;box-shadow:none}
+html[data-style="abstract"] input.sw:checked{background:var(--good);border-color:var(--stroke)}
+
+/* seg / chips: outlined; on = purple */
+html[data-style="abstract"] .seg button{border:2px solid var(--stroke);border-radius:var(--r-s);font-weight:600}
+html[data-style="abstract"] .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--stroke);font-weight:800}
+html[data-style="abstract"] .chip{border:2px solid var(--stroke);font-weight:600;transition:rotate .28s cubic-bezier(.3,1.9,.5,1),translate .08s}
+html[data-style="abstract"] .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--stroke);color:var(--accent-ink);font-weight:800;rotate:-2deg}
+html[data-style="abstract"] .chip[aria-pressed="true"] small{color:inherit;opacity:.85}
+html[data-style="abstract"] .chips.recent .chip{color:var(--ink)}
+html[data-style="abstract"] :is(.chip,.seg button,.ac,.dv-range button,.need,.menu-item,.hb,.day,.wk-nav,.swap,.tick,.todo-x span):active{translate:1px 1px}
+html[data-style="abstract"] .chip.qchip{border-color:var(--stroke)}
+html[data-style="abstract"] .chip.more{color:var(--accent)}
+
+/* tags and badges: stickers */
+html[data-style="abstract"] .tag{border:1.5px solid var(--stroke);font-weight:800;line-height:1.4}
+html[data-style="abstract"] .tag.kcal{background:var(--pop-yellow);color:var(--pop-ink);font-weight:700}
+html[data-style="abstract"] .tag.good{background:var(--good-soft);color:var(--good)}
+html[data-style="abstract"] :is(.tag.adjust,.tag.ex){background:var(--warn-soft);color:var(--warn)}
+html[data-style="abstract"] :is(.tag.ok,.tag.src){background:var(--sunk);color:var(--ink)}
+html[data-style="abstract"] .tag.wait{border:1.5px dashed var(--stroke);color:var(--ink)}
+html[data-style="abstract"] .tag.hist{border-color:var(--muted);color:var(--muted)}
+html[data-style="abstract"] .tag.mine{background:var(--accent-soft);color:var(--accent)}
+html[data-style="abstract"] :is(.tag.askb,.tag.ag-new){background:var(--neon);color:var(--neon-ink)}
+html[data-style="abstract"] .tag.ag-new{rotate:2deg;box-shadow:1.5px 1.5px 0 var(--stroke)}
+html[data-style="abstract"] .badge{min-width:20px;height:20px;line-height:17px;border:1.5px solid var(--stroke);background:#E01E3C;color:#fff;font-weight:800;rotate:8deg}
+html[data-style="abstract"] .dayid{background:#111;color:var(--pop-yellow);border:1.5px solid var(--stroke)}
+html[data-style="abstract"] .tr-title .dayid{rotate:-4deg}
+html[data-style="abstract"] .xj-ic{background:#111;color:var(--pop-yellow);border:1px solid var(--stroke)}
+html[data-style="abstract"] .kind{border:1.5px solid var(--stroke);background:var(--sunk);color:var(--ink)}
+html[data-style="abstract"] .kind.daily{background:var(--neon);color:var(--neon-ink)}
+html[data-style="abstract"] .kind.weekly{background:var(--pop-cyan);color:var(--pop-ink)}
+html[data-style="abstract"] .kind.plan{background:var(--pop-pink);color:var(--pop-ink)}
+html[data-style="abstract"] .kind.phase{background:var(--good-soft);color:var(--good)}
+html[data-style="abstract"] .stat{background:var(--surface);border:1.5px solid var(--stroke);color:var(--muted)}
+html[data-style="abstract"] .stat b{font-size:17px;font-weight:700}
+html[data-style="abstract"] .goal{border:1.5px solid var(--stroke)}
+html[data-style="abstract"] .goal b{font-weight:700}
+html[data-style="abstract"] .goal.full{border-color:var(--stroke)}
+
+/* ---------- Claude: neon cards with black type ---------- */
+html[data-style="abstract"] .ag-mark{background:var(--neon);box-shadow:inset 0 0 0 1.5px var(--stroke)}
+html[data-style="abstract"] .ag-mark::before{background:var(--neon-ink)}
+html[data-style="abstract"] .ag-card{background:var(--ag-card);border:2px solid var(--stroke);box-shadow:4px 4px 0 var(--hard-ag);color:var(--ink)}
+html[data-style="abstract"] .ag-card .ag-mark{background:#111;box-shadow:inset 0 0 0 1.5px var(--stroke)}
+html[data-style="abstract"] .ag-card .ag-mark::before{background:var(--neon)}
+html[data-style="abstract"] .ag-h > .ag-mark{rotate:-6deg}
+html[data-style="abstract"] .ag-h b{font-size:16.5px;font-weight:800;-webkit-text-stroke:.3px currentColor}
+html[data-style="abstract"] .ag-t{font-size:17px}
+html[data-style="abstract"] .ag-sec{border-top:2px dashed color-mix(in srgb,var(--ink) 35%,transparent)}
+html[data-style="abstract"] .ag-sh{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .ag-nl{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .ag-more,html[data-style="abstract"] .todo-more{font-weight:800}
+html[data-style="abstract"] .ag-card .todo-r + .todo-r{border-top-color:color-mix(in srgb,var(--ink) 18%,transparent)}
+html[data-style="abstract"] .ag-card .todo-x span{border:1.5px solid var(--stroke);background:var(--surface);color:var(--ink)}
+html[data-style="abstract"] .need-list{border:2px solid var(--stroke);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .need i{background:var(--neon);box-shadow:0 0 0 1.5px var(--stroke);width:9px;height:9px}
+html[data-style="abstract"] .need svg.chev{color:var(--ink)}
+html[data-style="abstract"] .ag-banner .link-t,html[data-style="abstract"] .ag-banner svg.chev{color:var(--ink)}
+/* Claude's lines inside other cards */
+html[data-style="abstract"] :is(.wr-cm,.wait-cm,.ask,.cl-reply,.dv-say,.dv-wkr){background:var(--agent-soft);border:1.5px solid var(--stroke);color:var(--ink)}
+html[data-style="abstract"] .dv-wkr{border-width:2px;box-shadow:4px 4px 0 var(--hard-ag)}
+html[data-style="abstract"] .wait-cm{color:var(--ink)}
+html[data-style="abstract"] .ask-h{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .ask-q{font-weight:700}
+html[data-style="abstract"] .nx{color:var(--ink);background:linear-gradient(transparent 55%,var(--hl-ag) 55%);font-weight:800}
+html[data-style="abstract"] :is(.rx-src.cl,.rx-note){color:var(--agent);font-weight:800}
+html[data-style="abstract"] .rx-src .ag-mark,html[data-style="abstract"] .nx .ag-mark{box-shadow:none}
+
+/* ---------- 今日: week strip ---------- */
+html[data-style="abstract"] .day{border:2px solid transparent}
+html[data-style="abstract"] .day .dw{font-weight:600}
+html[data-style="abstract"] .day .dn{font-size:22px;font-weight:700}
+html[data-style="abstract"] .day.is-today .dn{color:var(--accent)}
+html[data-style="abstract"] .day.is-sel{background:var(--accent);color:var(--accent-ink);border-color:var(--stroke);box-shadow:var(--shadow-xs);rotate:-2deg}
+html[data-style="abstract"] .day.is-sel .dn{color:var(--accent-ink)}
+html[data-style="abstract"] .day.is-sel .ticks i{background:var(--accent-ink)}
+html[data-style="abstract"] .ticks i{background:var(--accent)}
+html[data-style="abstract"] .ticks i.w{background:var(--plate-red)}
+html[data-style="abstract"] .wk-nav{color:var(--ink)}
+
+/* 五件套: outlined pills; done = green, every other one stamped at a tilt */
+html[data-style="abstract"] .hb{border:2px solid var(--stroke);box-shadow:var(--shadow-xs);background:var(--surface)}
+html[data-style="abstract"] .hb-n{font-weight:800}
+html[data-style="abstract"] .hb-v{color:var(--muted);font-weight:600}
+html[data-style="abstract"] .hb.ok{background:var(--good-soft);border-color:var(--stroke)}
+html[data-style="abstract"] .hb.ok:nth-child(odd){rotate:-2deg}
+html[data-style="abstract"] .hb.ok .hb-n,html[data-style="abstract"] .hb.ok .hb-v{color:var(--good)}
+
+/* 摄入: bigger figures, outlined bars */
+html[data-style="abstract"] .ik-v b{font-size:42px;font-weight:700}
+html[data-style="abstract"] .ik-v .tgt{color:var(--muted);font-weight:600}
+html[data-style="abstract"] .ik-left{color:var(--ink);font-weight:600}
+html[data-style="abstract"] .ik-left b{font-size:19px;font-weight:700}
+html[data-style="abstract"] .meter-label{color:var(--ink);font-weight:700}
+html[data-style="abstract"] .meter-val b{font-size:22px;font-weight:700}
+html[data-style="abstract"] .bar{height:12px;border:2px solid var(--stroke);border-radius:999px;background:var(--surface)}
+html[data-style="abstract"] .bar.big{height:16px}
+html[data-style="abstract"] .bar i{border-radius:0}
+html[data-style="abstract"] .pchips b{font-weight:700}
+html[data-style="abstract"] .ifoot,html[data-style="abstract"] .meters-foot{color:var(--ink)}
+
+/* 饮食: photos as tilted stickers (every third one straight) */
+html[data-style="abstract"] .thumb{border:2px solid var(--stroke);border-radius:10px;color:var(--ink)}
+html[data-style="abstract"] .rows > :nth-child(3n+1) .thumb{rotate:-3deg}
+html[data-style="abstract"] .rows > :nth-child(3n) .thumb{rotate:2.5deg}
+html[data-style="abstract"] .row-t{font-weight:800}
+html[data-style="abstract"] .sec-h .cam{border:2px solid var(--stroke);box-shadow:var(--shadow-xs);rotate:-6deg}
+html[data-style="abstract"] .ac span{border:1.5px solid var(--stroke);color:var(--ink);font-weight:700}
+html[data-style="abstract"] .empty{color:var(--ink)}
+
+/* 训练 */
+html[data-style="abstract"] .tr-title{font-size:19px}
+html[data-style="abstract"] .swap{border:2px solid var(--stroke);color:var(--ink);font-weight:800;box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .picknote,html[data-style="abstract"] .tr-note{border:1.5px dashed var(--stroke);color:var(--ink)}
+html[data-style="abstract"] .rx-n{font-weight:800}
+html[data-style="abstract"] .rx-big{font-size:24px;font-weight:700}
+html[data-style="abstract"] .wr-h b{font-weight:800}
+html[data-style="abstract"] .wr-v{font-weight:700}
+html[data-style="abstract"] .wr-sum b{font-weight:700}
+html[data-style="abstract"] .vd{border:1.5px solid var(--stroke);font-weight:800}
+html[data-style="abstract"] .vd.up{background:var(--good);color:var(--good-ink)}
+html[data-style="abstract"] .nx-k{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .xset{border:1.5px solid var(--stroke);font-weight:700}
+html[data-style="abstract"] .xset.warm{border-style:dashed;border-color:var(--muted)}
+html[data-style="abstract"] .tick{border:2px solid var(--stroke);color:var(--ink);transition:rotate .28s cubic-bezier(.3,1.9,.5,1),translate .08s}
+html[data-style="abstract"] .tick[aria-pressed="true"]{background:var(--good);border-color:var(--stroke);color:var(--good-ink);rotate:-4deg}
+
+/* 称体重, 喝水, 身体 */
+html[data-style="abstract"] .weigh-h label{font-weight:800;font-size:16px}
+html[data-style="abstract"] .wv .ik-v b{font-size:36px}
+html[data-style="abstract"] .wv{flex-wrap:wrap;row-gap:2px}
+html[data-style="abstract"] .water-btns .btn .num{font-size:19px;font-weight:700}
+html[data-style="abstract"] .kv .k{color:var(--ink);font-weight:600}
+html[data-style="abstract"] .kv .v{font-size:26px;font-weight:700}
+html[data-style="abstract"] .health .kv .v{font-size:21px}
+html[data-style="abstract"] .recovery{border:2px solid var(--stroke);color:var(--warn);font-weight:600}
+html[data-style="abstract"] .sbar i{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--stroke) 30%,transparent)}
+
+/* 今天状态 (晨间状态, app.js feelCard): 1–5 buttons outlined, the picked one purple */
+html[data-style="abstract"] :is(.feel-h b,.fl-t){font-weight:800}
+html[data-style="abstract"] .fl-k{color:var(--ink);font-weight:700}
+html[data-style="abstract"] .fl-b{border:2px solid var(--stroke);background:var(--surface);color:var(--ink)}
+html[data-style="abstract"] .fl-b[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--stroke)}
+html[data-style="abstract"] .fl-b[aria-pressed="true"] small{color:inherit}
+html[data-style="abstract"] .fl-b:active{translate:1px 1px}
+
+/* to-dos: a square outlined box; done = green with a tick */
+html[data-style="abstract"] .todo-i .box{border:2px solid var(--stroke);border-radius:6px;background:var(--surface);transition:translate .08s,scale .08s}
+html[data-style="abstract"] .todo-i:active .box{scale:.88;translate:1px 1px}
+html[data-style="abstract"] .todo-i[aria-checked="true"] .box{background:var(--good);border-color:var(--stroke);rotate:-6deg}
+html[data-style="abstract"] .todo-i .box svg{stroke:var(--good-ink);stroke-width:3}
+
+/* ---------- 计划 ---------- */
+html[data-style="abstract"] .plan-head h2{font-size:22px}
+html[data-style="abstract"] .wp{background:var(--surface);border:2px solid var(--stroke);color:var(--muted)}
+html[data-style="abstract"] .wp.on{background:var(--pop-yellow);color:#3B3524}
+html[data-style="abstract"] .wp.on .wp-v{color:var(--pop-ink)}
+html[data-style="abstract"] .wp-v{color:var(--ink)}
+html[data-style="abstract"] .wp.now{box-shadow:var(--shadow-xs);rotate:-3deg}
+html[data-style="abstract"] .tg{border-top-width:5px}
+html[data-style="abstract"] .tg .k{color:var(--ink);font-weight:700}
+html[data-style="abstract"] .tg .v{font-size:28px;font-weight:700}
+html[data-style="abstract"] .pd-t b{font-size:17px;font-weight:800}
+html[data-style="abstract"] .pex-l b{font-weight:800}
+html[data-style="abstract"] .pex-r .num{font-size:19px;font-weight:700}
+html[data-style="abstract"] .xjday{background:var(--sunk)}
+html[data-style="abstract"] .next-line b{font-weight:800}
+html[data-style="abstract"] .ideas b{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .q-line{font-weight:800}
+
+/* ---------- Claude 页: its own rules are in claude.css ---------- */
+
+/* ---------- 数据 ---------- */
+html[data-style="abstract"] .dv-wk th[scope=row]{color:var(--ink)}
+html[data-style="abstract"] .dv-wk b{font-size:20px;font-weight:700}
+html[data-style="abstract"] .dv-wk :is(th,td){border-top-color:var(--sep)}
+html[data-style="abstract"] .dv-range{background:var(--surface);border:2px solid var(--stroke)}
+html[data-style="abstract"] .dv-range button{color:var(--ink);font-weight:600}
+html[data-style="abstract"] .dv-range button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:800;box-shadow:none}
+html[data-style="abstract"] .dv-big{font-size:46px;font-weight:700}
+html[data-style="abstract"] .dv-kvs{border-top:2px dashed var(--sep)}
+html[data-style="abstract"] .dv-kv .k{color:var(--ink);font-weight:600}
+html[data-style="abstract"] .dv-kv .v{font-size:21px;font-weight:700}
+html[data-style="abstract"] .dv-say .by,html[data-style="abstract"] .dv-wkr .by{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .dv-say .lv{color:var(--ink)}
+html[data-style="abstract"] .dv-say .lv::before{box-shadow:0 0 0 1.5px var(--stroke)}
+html[data-style="abstract"] .dv-say .do::before{color:var(--ink)}
+html[data-style="abstract"] .dv-say.dim{background:var(--sunk)}
+html[data-style="abstract"] .dv-warn,html[data-style="abstract"] .dv-remind{border:1.5px solid var(--stroke)}
+html[data-style="abstract"] .dv-from{border:1.5px solid var(--stroke);color:var(--ink)}
+html[data-style="abstract"] .dv-ct{font-weight:800}
+html[data-style="abstract"] .dv-chart .m-line{stroke-width:2.6}
+html[data-style="abstract"] .dv-chart .m-dot{stroke-width:2.2}
+html[data-style="abstract"] .dv-chart text.now{font-weight:700}
+html[data-style="abstract"] .dv-dd .m{border:2px solid var(--stroke);font-weight:700}
+html[data-style="abstract"] .dv-dd.plan .m{border:2px dashed var(--plate-red)}
+html[data-style="abstract"] :is(.dv-ex,.dv-m){border-top-color:var(--sep)}
+html[data-style="abstract"] .dv-ex .nm b,html[data-style="abstract"] .dv-m .nm b{font-weight:800}
+html[data-style="abstract"] .dv-ex .ch,html[data-style="abstract"] .dv-m .val b{font-weight:700}
+html[data-style="abstract"] .dv-m .nm b i{border:1px solid var(--stroke)}
+html[data-style="abstract"] .dv-spark path{stroke-width:2}
+html[data-style="abstract"] .dv-ph{border:2px solid var(--stroke)}
+html[data-style="abstract"] .dv-ph.next{border:2px dashed var(--stroke)}
+html[data-style="abstract"] :is(.dv-tip,.wtip){border:2px solid var(--stroke);box-shadow:var(--shadow-xs);border-radius:8px}
+html[data-style="abstract"] .wchart .avg,html[data-style="abstract"] .ichart .tgt{stroke-width:2.6}
+
+/* ---------- 我的 ---------- */
+html[data-style="abstract"] .avatar{border:2px solid var(--stroke);color:var(--ink)}
+html[data-style="abstract"] .avatar.big{background:var(--pop-cyan);color:var(--pop-ink);rotate:-4deg;box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .me-n b,html[data-style="abstract"] .acct b{font-weight:800}
+html[data-style="abstract"] .kvs .k,html[data-style="abstract"] .tok,html[data-style="abstract"] .prefs-sum{color:var(--ink)}
+html[data-style="abstract"] .kvs .v.num{font-size:21px;font-weight:700}
+html[data-style="abstract"] .kr-st.ok{font-weight:800}
+html[data-style="abstract"] code{border:1px solid var(--stroke)}
+
+/* ---------- tab bar and ＋ ---------- */
+html[data-style="abstract"] .tabbar{background:var(--surface);border-top:2px solid var(--stroke);-webkit-backdrop-filter:none;backdrop-filter:none}
+html[data-style="abstract"] .tab{position:relative;isolation:isolate;font-size:11px;font-weight:700;color:var(--muted)}
+/* the current tab: a yellow sticker (Claude: neon) under its icon and name, both black on it */
+html[data-style="abstract"] .tab[aria-current="page"],html[data-style="abstract"] .tab[data-tab="claude"][aria-current="page"]{color:#111;font-weight:800}
+html[data-style="abstract"] .tab[data-tab][aria-current="page"]::before{content:"";position:absolute;z-index:-1;top:4px;bottom:4px;left:50%;width:60px;margin-left:-30px;border-radius:12px;background:var(--pop-yellow);border:2px solid var(--stroke);box-shadow:var(--shadow-xs);rotate:-3deg}
+html[data-style="abstract"] .tab[data-tab="claude"][aria-current="page"]::before{background:var(--neon);rotate:2deg}
+html[data-style="abstract"] .tab[data-tab][aria-current="page"] svg{stroke-width:2.2}
+html[data-style="abstract"] .tab-ic .badge{box-shadow:none;top:-7px}
+html[data-style="abstract"] .tab.add span.plus{width:50px;height:40px;border-radius:12px;background:var(--accent);color:var(--accent-ink);border:2px solid var(--stroke);box-shadow:3px 3px 0 var(--hard-ag);rotate:-4deg;transition:translate .08s,box-shadow .08s,rotate .2s}
+html[data-style="abstract"] .tab.add svg{stroke-width:3}
+html[data-style="abstract"] .tab.add:active span.plus{translate:2px 2px;box-shadow:1px 1px 0 var(--hard-ag)}
+html[data-style="abstract"] .tab.add[aria-expanded="true"] span.plus{rotate:0deg}
+
+/* ＋ menu: an outlined card; each way to log has its sticker colour */
+html[data-style="abstract"] .menu-card{border:2px solid var(--stroke);box-shadow:5px 5px 0 var(--hard);border-radius:18px}
+html[data-style="abstract"] .menu-g + .menu-g{border-top:2px dashed var(--sep)}
+html[data-style="abstract"] .menu-item b{font-weight:800}
+html[data-style="abstract"] .menu-item small{color:var(--muted)}
+html[data-style="abstract"] .menu-item .mi{border:2px solid var(--stroke);background:var(--pop-yellow);color:#111;box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .menu-item .mi svg{stroke-width:2}
+html[data-style="abstract"] .menu-item[data-act="new-meal"] .mi{background:var(--pop-pink)}
+html[data-style="abstract"] .menu-item[data-act="water-today"] .mi{background:var(--pop-cyan)}
+html[data-style="abstract"] :is(.menu-item[data-act="xj-sync"],.menu-item[data-act="new-workout"]) .mi{background:var(--pop-pink)}
+html[data-style="abstract"] .menu-item[data-act="new-body"] .mi{background:var(--pop-cyan)}
+html[data-style="abstract"] .menu-item.main .mi{background:var(--accent);color:var(--accent-ink);rotate:-5deg}
+html[data-style="abstract"] .menu-item.ag .mi{background:var(--neon);color:var(--neon-ink)}
+html[data-style="abstract"] .menu-item:active{background:var(--sunk)}
+
+/* ---------- sheets, toast ---------- */
+html[data-style="abstract"] .sheet-panel{border:2px solid var(--stroke);border-bottom:0;background-image:radial-gradient(var(--dots) 1.2px,transparent 1.7px);background-size:18px 18px}
+html[data-style="abstract"] .sheet-h h3{font-size:18px}
+html[data-style="abstract"] .sheet-f{border-top:2px solid var(--stroke)}
+html[data-style="abstract"] .sheet-msg{border-top:2px solid var(--stroke)}
+html[data-style="abstract"] :is(.ph,.ph-add){border:2px solid var(--stroke)}
+html[data-style="abstract"] .ph-add{border-style:dashed;color:var(--ink)}
+html[data-style="abstract"] .ph .x span{background:#111;border:1.5px solid #fff}
+html[data-style="abstract"] .act-row b{font-weight:800}
+html[data-style="abstract"] .macro-line .big{font-size:34px;font-weight:700}
+html[data-style="abstract"] .items li{border-bottom-color:var(--sep)}
+html[data-style="abstract"] .toast{background:var(--pop-yellow);color:#111;border:2px solid var(--stroke);box-shadow:4px 4px 0 var(--hard);font-weight:800;rotate:-1deg}
+html[data-style="abstract"] .toast.err{background:#D0182B;color:#fff}
+
+/* ---------- v4 screens: 今天状态 line, 身材照, 常去的店, 阶段进度, 新纪录, 通知, 数据页新卡, 人设 ---------- */
+/* 今天状态 folded to one line (a .panel button): presses like a sticker */
+html[data-style="abstract"] .feel-line{transition:translate .08s,box-shadow .08s}
+html[data-style="abstract"] .feel-line:active{translate:2px 2px;box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .fl-v{color:var(--ink)}
+html[data-style="abstract"] .fl-v b{font-size:19px;font-weight:700}
+html[data-style="abstract"] .fl-b .num{font-weight:700}
+html[data-style="abstract"] .fl-b:active{opacity:1}
+/* 身材照 sheet: outlined spots, kept straight (body photos are not a joke) */
+html[data-style="abstract"] .pp-tip{border:1.5px solid var(--stroke)}
+html[data-style="abstract"] .pp-tip b{font-weight:800}
+html[data-style="abstract"] .pp-ph{border:2px solid var(--stroke)}
+html[data-style="abstract"] .pp-add{border:2px dashed var(--stroke);color:var(--ink)}
+html[data-style="abstract"] .pp-ph .x span{background:#111;border:1.5px solid #fff}
+html[data-style="abstract"] .pp-l{color:var(--ink);font-weight:800}
+/* 常去的店怎么点 (plan page): the first pick is the yellow sticker */
+html[data-style="abstract"] .pl + .pl{border-top-color:var(--sep)}
+html[data-style="abstract"] .pl-n b{font-size:16px;font-weight:800}
+html[data-style="abstract"] .pl summary svg.chev{color:var(--ink)}
+html[data-style="abstract"] .pl-picks li{background:var(--surface);border:1.5px solid var(--stroke);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .pl-picks li:first-child{background:var(--pop-yellow);color:var(--pop-ink)}
+html[data-style="abstract"] .pl-picks li:first-child span{color:#3B3524}
+html[data-style="abstract"] .pl-picks li b{font-weight:800}
+/* the tip in the meal form (Claude's: neon) */
+html[data-style="abstract"] .place-tip{background:var(--agent-soft);border:1.5px solid var(--stroke);box-shadow:2px 2px 0 var(--hard-ag)}
+html[data-style="abstract"] .pt-h{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .pt-pick{font-weight:800}
+/* 阶段进度: an outlined bar, purple done, warn stripes for the 减量周, a yellow pin for today */
+html[data-style="abstract"] .phase .meta{color:var(--ink);font-weight:600}
+html[data-style="abstract"] .ph-bar{height:16px;margin-top:4px;border:2px solid var(--stroke);border-radius:999px;background:var(--surface)}
+html[data-style="abstract"] .ph-bar .done{border-radius:0;background:var(--accent)}
+html[data-style="abstract"] .ph-bar .dl,html[data-style="abstract"] .ph-dl i{background:repeating-linear-gradient(135deg,var(--warn) 0 3px,transparent 3px 6px)}
+html[data-style="abstract"] .ph-bar .wk{background:var(--stroke);opacity:.3}
+html[data-style="abstract"] .ph-bar .now{width:6px;margin-left:-3px;border-radius:2px;background:var(--pop-yellow);box-shadow:0 0 0 1.5px var(--stroke)}
+html[data-style="abstract"] .ph-w{font-weight:800}
+html[data-style="abstract"] .ph-dl{color:var(--ink)}
+html[data-style="abstract"] .ph-dl i{width:18px;height:10px;border-radius:3px;box-shadow:inset 0 0 0 1.5px var(--stroke)}
+html[data-style="abstract"] .ph-dl.on{color:var(--warn);font-weight:800}
+html[data-style="abstract"] .ph-note{border:1.5px solid var(--stroke);font-weight:600}
+html[data-style="abstract"] .ph-line b{display:inline-block;margin-right:8px;padding:0 6px;border:1.5px solid var(--stroke);border-radius:5px;background:var(--pop-cyan);color:var(--pop-ink);font-weight:800;line-height:1.5}
+html[data-style="abstract"] .ph-line + .ph-line b{background:var(--pop-pink)}
+/* 新纪录: a yellow sticker on the result row (every other row tilted) and the set itself */
+html[data-style="abstract"] :is(.vd.pr,.xset.pr){background:var(--pop-yellow);color:var(--pop-ink)}
+html[data-style="abstract"] .vd.pr{box-shadow:1.5px 1.5px 0 var(--stroke)}
+html[data-style="abstract"] .wr-r:nth-child(odd) .vd.pr{rotate:-3deg}
+html[data-style="abstract"] .xset.pr :is(i,small){color:var(--pop-ink);opacity:.8}
+/* 通知 kinds (.push-k is a .tgls); greyed out while notifications are off, but still readable */
+html[data-style="abstract"] .tgls.off{opacity:1;border-style:dashed;box-shadow:none}
+html[data-style="abstract"] .tgls.off :is(.tgl > span,small){color:var(--muted)}
+html[data-style="abstract"] .tgls.off input.sw{opacity:.5}
+/* 数据: 围度和体脂, 身材照, 个人纪录 */
+html[data-style="abstract"] .body-row.more{border-top-color:var(--sep)}
+html[data-style="abstract"] .dv-focus b{font-weight:800}
+html[data-style="abstract"] .dv-m .ch:is(.good,.bad){font-weight:700}
+html[data-style="abstract"] .dv-pv button:disabled{opacity:1;color:var(--muted);background:var(--sunk);border-style:dashed}
+html[data-style="abstract"] .dv-pdate.one{background:var(--surface);border:2px solid var(--stroke);color:var(--ink)}
+html[data-style="abstract"] .dv-ph.none{border-style:dashed}
+html[data-style="abstract"] .dv-lb-x{background:#111;border:2px solid #fff}
+
+/* ---------- voice.js lines ---------- */
+/* the line under a training day's title (LSJVoice.focusLine) */
+/* the 五件套 pill's phrase (LSJVoice.habit), under the number */
+html[data-style="abstract"] .hb-q{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;font-size:11px;font-weight:800;line-height:1.2;color:var(--ink);text-align:center;text-wrap:balance}
+html[data-style="abstract"] .hb.ok .hb-q{color:var(--good)}
+/* outside the abstract style these lines are never rendered; should one be, it stays quiet */
+html:not([data-style="abstract"]) .hb-q{display:none}
+
+/* ---------- narrow phones: the plain sizes, a notch up ---------- */
+@media (max-width:380px){
+  html[data-style="abstract"] .ik-v b{font-size:36px}
+  html[data-style="abstract"] .meter-val b{font-size:18px}
+  html[data-style="abstract"] .rx-big{font-size:21px}
+  html[data-style="abstract"] .wr-v{font-size:16px}
+  html[data-style="abstract"] .kv .v{font-size:22px}
+  html[data-style="abstract"] .health .kv .v{font-size:19px}
+  html[data-style="abstract"] .tr-title{font-size:18px}
+  html[data-style="abstract"] .top-t{font-size:22px}
+  html[data-style="abstract"] .sec-h h2{font-size:19px}
+  html[data-style="abstract"] .day .dn{font-size:20px}
+  html[data-style="abstract"] .dv-big{font-size:40px}
+}
+@media (max-width:359px){
+  html[data-style="abstract"] .hb-q{font-size:10.5px}
+  html[data-style="abstract"] .tab[data-tab][aria-current="page"]::before{width:52px;margin-left:-26px}
+}
+
+/* ---------- reduced motion: no springs, no press shift ---------- */
+@media (prefers-reduced-motion: reduce){
+  html[data-style="abstract"] *{transition:none!important}
+  html[data-style="abstract"] :is(.btn,.chip,.seg button,.ac,.dv-range button,.need,.menu-item,.hb,.day,.wk-nav,.swap,.tick,.todo-x span,.fl-b,.feel-line):active,
+  html[data-style="abstract"] .tab.add:active span.plus,html[data-style="abstract"] .todo-i:active .box{translate:none!important;scale:none!important}
+}
+
+/* ---------- 训练中 (the full-screen session) ---------- */
+html[data-style="abstract"] .live{background-color:var(--bg);background-image:radial-gradient(var(--dots) 1.2px,transparent 1.7px);background-size:18px 18px}
+html[data-style="abstract"] .lv-top{background:var(--bg);border-bottom:2px solid var(--stroke);-webkit-backdrop-filter:none;backdrop-filter:none}
+html[data-style="abstract"] .lv-name{font-weight:800;-webkit-text-stroke:.3px currentColor}
+html[data-style="abstract"] .lv-sub .num{font-size:20px;font-weight:700}
+html[data-style="abstract"] .lv-top .lv-done{box-shadow:var(--shadow-s)}
+html[data-style="abstract"] :is(.lv-row,.lv-ex){border:2px solid var(--stroke);box-shadow:var(--shadow-s)}
+html[data-style="abstract"] .lv-row{transition:translate .08s,box-shadow .08s}
+html[data-style="abstract"] .lv-row:active{translate:2px 2px;box-shadow:var(--shadow-xs);background:var(--surface)}
+html[data-style="abstract"] .lv-row.full{background:var(--good-soft)}
+html[data-style="abstract"] .lv-row.full .lv-rn b{color:var(--ink)}
+html[data-style="abstract"] .lv-rn b,html[data-style="abstract"] .lv-exn{font-weight:800}
+html[data-style="abstract"] .lv-ex{box-shadow:var(--shadow)}
+html[data-style="abstract"] .lv-exn{font-size:19px;-webkit-text-stroke:.3px currentColor}
+html[data-style="abstract"] .lv-k{border:1.5px solid var(--stroke);background:var(--pop-yellow);color:var(--pop-ink);line-height:16px}
+html[data-style="abstract"] .lv-rx.cl .lv-k{background:var(--neon);color:var(--neon-ink)}
+html[data-style="abstract"] .lv-rx b{font-weight:700}
+html[data-style="abstract"] .lv-i{color:var(--ink)}
+html[data-style="abstract"] .lv-last{color:var(--muted)}
+html[data-style="abstract"] .lv-note{border:1.5px solid var(--stroke);background:var(--pop-cyan);color:var(--pop-ink);font-weight:600}
+html[data-style="abstract"] .lv-empty{border:2px dashed var(--stroke);color:var(--ink);font-weight:600}
+/* set rows: outlined stickers; the one to do next is purple-edged, done ones go green with a tilted tick */
+html[data-style="abstract"] .lv-seth{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .lv-set{background:var(--sunk);border:2px solid transparent}
+html[data-style="abstract"] .lv-set.focus{background:var(--surface);border-color:var(--accent);box-shadow:3px 3px 0 var(--accent)}
+html[data-style="abstract"] .lv-set.done{background:var(--good-soft);border-color:transparent;box-shadow:none}
+html[data-style="abstract"] .lv-set.warm{background:transparent;border:2px dashed var(--stroke)}
+html[data-style="abstract"] .lv-set.warm.focus{border-style:solid;border-color:var(--accent)}
+html[data-style="abstract"] .lv-sn{color:var(--ink)}
+html[data-style="abstract"] .lv-sn .num{font-weight:800}
+html[data-style="abstract"] .lv-sn small{border:1.5px solid var(--stroke);background:var(--pop-yellow);color:var(--pop-ink);rotate:-6deg;font-weight:800}
+html[data-style="abstract"] .lv-st{border:2px solid var(--stroke);border-radius:10px}
+html[data-style="abstract"] .lv-pm{font-weight:800}
+html[data-style="abstract"] .lv-pm:active{background:var(--pop-yellow);color:var(--pop-ink)}
+html[data-style="abstract"] .lv-st input.lv-v{border:0;box-shadow:none;background:transparent;font-weight:700}
+html[data-style="abstract"] .lv-st input.lv-v:focus{border:0;box-shadow:none;background:var(--pop-yellow);color:var(--pop-ink)}
+html[data-style="abstract"] .lv-st input.lv-v::placeholder{color:var(--muted);opacity:.7}
+html[data-style="abstract"] .lv-set.done .lv-st{border-color:var(--stroke)}
+html[data-style="abstract"] .lv-tick{border:2px solid var(--stroke);color:var(--ink);transition:rotate .28s cubic-bezier(.3,1.9,.5,1),translate .08s}
+html[data-style="abstract"] .lv-tick[aria-pressed="true"]{background:var(--good);border-color:var(--stroke);color:var(--good-ink);rotate:-5deg;box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .lv-set.focus .lv-tick:not([aria-pressed="true"]){border-color:var(--accent);color:var(--accent)}
+html[data-style="abstract"] .lv-set.pr{background:color-mix(in srgb,var(--pop-yellow) 40%,var(--good-soft))}
+html[data-style="abstract"] .lv-cm{color:var(--ink);font-weight:800}
+/* the dock: a black ticket with yellow digits; 休息结束 turns neon; the big ✓ is a purple sticker */
+html[data-style="abstract"] .lv-dock{background:var(--bg);border-top:2px solid var(--stroke)}
+html[data-style="abstract"] .lv-go{border:2px solid var(--stroke);box-shadow:var(--shadow-s);border-radius:16px}
+html[data-style="abstract"] .lv-go-ck{border:2px solid var(--accent-ink);background:transparent;rotate:-6deg}
+html[data-style="abstract"] .lv-go-t b{font-weight:800}
+html[data-style="abstract"] .lv-go-t small{font-family:var(--f-num);font-size:19px;font-weight:700}
+html[data-style="abstract"] .lv-rest{background:#111;color:#FFF6D9;border:2px solid var(--stroke);box-shadow:var(--shadow-s)}
+html[data-style="abstract"] .lv-rest .lr-t{color:var(--pop-yellow);font-size:44px}
+html[data-style="abstract"] .lv-rest .lr-b{background:transparent;border:2px solid #FFF6D9;color:#FFF6D9;font-weight:800}
+html[data-style="abstract"] .lv-rest .lr-b:active{background:var(--pop-yellow);color:#111;opacity:1}
+html[data-style="abstract"] .lv-rest .lr-bar{background:var(--neon)}
+html[data-style="abstract"] .lv-rest.done{background:var(--neon);color:var(--neon-ink);rotate:-1deg}
+html[data-style="abstract"] .lv-rest.done .lr-b{border-color:var(--neon-ink);color:var(--neon-ink)}
+html[data-style="abstract"] .lv-rest.done .lr-n b{font-weight:800}
+/* 「训练进行中」 bar and the 训练 card's part */
+html[data-style="abstract"] .lb-btn{background:var(--accent);color:var(--accent-ink);border:2px solid var(--stroke);box-shadow:var(--shadow-xs);font-weight:700}
+html[data-style="abstract"] .lb-btn .lb-dot{background:var(--neon);box-shadow:0 0 0 1.5px var(--stroke)}
+html[data-style="abstract"] .lb-t .num{font-size:19px;font-weight:700}
+html[data-style="abstract"] .lv-card{background:var(--pop-cyan);color:var(--pop-ink);border:2px solid var(--stroke);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .lv-card .lvc-t{color:var(--pop-ink)}
+html[data-style="abstract"] .lv-card .lvc-t b{color:var(--pop-ink)}
+html[data-style="abstract"] .lv-card .lvc-h b{font-weight:800}
+html[data-style="abstract"] .lv-card .lvc-clock{font-weight:700}
+html[data-style="abstract"] .lv-card.stale{background:var(--warn-soft);color:var(--ink)}
+html[data-style="abstract"] .lv-card.stale p{color:var(--ink)}
+html[data-style="abstract"] .lv-card.stale p b{color:var(--warn);font-weight:800}
+/* 完成, the picker */
+html[data-style="abstract"] .lf-k{border:2px solid var(--stroke);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .lf-l{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .lf-v b{font-weight:700}
+html[data-style="abstract"] .lf-prs p{background:var(--pop-yellow);color:var(--pop-ink);border:2px solid var(--stroke);box-shadow:var(--shadow-xs);font-weight:700}
+html[data-style="abstract"] .lf-prs p:nth-child(odd){rotate:-1deg}
+html[data-style="abstract"] .lp-rows{border:2px solid var(--stroke);box-shadow:var(--shadow-s)}
+html[data-style="abstract"] .lp-row + .lp-row{border-top-color:var(--sep)}
+html[data-style="abstract"] .lp-n b{font-weight:800}
+html[data-style="abstract"] .lp-new{border:2px solid var(--stroke);background:var(--pop-yellow);color:var(--pop-ink);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .lp-new .chip{color:var(--ink)}
+html[data-style="abstract"] .lp-new .chip[aria-pressed="true"]{color:var(--accent-ink)}
+/* 新纪录: a big tilted sticker that pops in, with stars flying off it */
+html[data-style="abstract"] .pp-card{border:3px solid #111;box-shadow:8px 8px 0 #111;background:var(--pop-yellow);color:#111;rotate:-5deg;padding:20px 30px 22px}
+html[data-style="abstract"] .pp-k{font-size:36px;font-weight:900;-webkit-text-stroke:1px #111;letter-spacing:.04em;padding:0 10px;background:linear-gradient(transparent 55%,var(--pop-pink) 55%,var(--pop-pink) 92%,transparent 92%)}
+html[data-style="abstract"] .pp-n{font-size:17px;font-weight:800}
+html[data-style="abstract"] .pp-v{font-size:38px;font-weight:700}
+html[data-style="abstract"] .pp-s{display:block;position:absolute;width:34px;height:34px;background:var(--pop-pink);-webkit-mask:var(--star) center/contain no-repeat;mask:var(--star) center/contain no-repeat}
+html[data-style="abstract"] .pp-s:nth-of-type(1){top:-22px;left:-18px;background:var(--neon)}
+html[data-style="abstract"] .pp-s:nth-of-type(2){top:-26px;right:-10px;width:26px;height:26px;background:var(--pop-cyan)}
+html[data-style="abstract"] .pp-s:nth-of-type(3){bottom:-20px;left:12%;width:24px;height:24px}
+html[data-style="abstract"] .pp-s:nth-of-type(4){bottom:-24px;right:-16px;background:var(--accent)}
+html[data-style="abstract"] .pp-s:nth-of-type(5){top:40%;left:-30px;width:20px;height:20px;background:var(--pop-cyan)}
+html[data-style="abstract"] .pp-s:nth-of-type(6){top:30%;right:-30px;width:22px;height:22px;background:var(--neon)}
+html[data-style="abstract"] .pr-pop.go .pp-card{animation:ppin .55s cubic-bezier(.2,1.6,.4,1) both}
+html[data-style="abstract"] .pr-pop.go .pp-s{animation:ppstar .9s ease-out both}
+@keyframes ppin{0%{transform:scale(.3) rotate(14deg);opacity:0}60%{opacity:1}100%{transform:none}}
+@keyframes ppstar{0%{transform:scale(0) rotate(-90deg);opacity:0}60%{transform:scale(1.25) rotate(10deg);opacity:1}100%{transform:none}}
+@media (prefers-reduced-motion: reduce){
+  html[data-style="abstract"] .pr-pop.go :is(.pp-card,.pp-s){animation:none!important}
+  html[data-style="abstract"] :is(.lv-row,.lv-tick):active{translate:none!important}
+}
+html[data-style="abstract"] .menu-item.lvm .mi{background:var(--pop-pink);color:#111;rotate:4deg}
+html[data-style="abstract"] .tr-go .btn{font-size:17px;rotate:-.6deg}
+
+/* ---------- v5: 新人引导, 加到主屏幕, 邀请, 临时目标 ---------- */
+html[data-style="abstract"] .onb{background-color:var(--bg);background-image:radial-gradient(var(--dots) 1.2px,transparent 1.7px);background-size:18px 18px}
+html[data-style="abstract"] .onb-prog i{background:var(--surface);border:1.5px solid var(--stroke);height:9px;border-radius:5px}
+html[data-style="abstract"] .onb-prog i.done{background:var(--accent)}
+html[data-style="abstract"] .onb-prog i.on{background:var(--neon)}
+html[data-style="abstract"] .onb-n{color:var(--ink);font-weight:700}
+html[data-style="abstract"] .onb-skip{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .onb-icon{border:2px solid var(--stroke);box-shadow:var(--shadow-s);rotate:-4deg}
+html[data-style="abstract"] .onb-t{font-weight:800;-webkit-text-stroke:.35px currentColor}
+html[data-style="abstract"] .onb-t span{padding:0 2px;background:linear-gradient(transparent 58%,var(--hl) 58%,var(--hl) 90%,transparent 90%)}
+html[data-style="abstract"] .onb-card{border:2px solid var(--stroke);box-shadow:var(--shadow)}
+html[data-style="abstract"] .onb-card h2{font-weight:800}
+html[data-style="abstract"] [data-step="hello"] .onb-card{background:var(--ag-card);border-color:var(--stroke);box-shadow:4px 4px 0 var(--hard-ag);rotate:-.4deg}
+html[data-style="abstract"] .onb-ok{color:var(--good);font-weight:800}
+html[data-style="abstract"] .onb-warn{border:1.5px dashed var(--stroke);color:var(--ink)}
+html[data-style="abstract"] .onb-f{background:var(--bg);border-top:2px solid var(--stroke)}
+html[data-style="abstract"] .onb-main{font-size:17px}
+html[data-style="abstract"] .onb-nav .link{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .onb-nav .link:last-child:not(:first-child){color:var(--accent)}
+html[data-style="abstract"] .onb-nudge{background:var(--ag-card);box-shadow:4px 4px 0 var(--hard-ag)}
+html[data-style="abstract"] .tag.tmp{background:var(--pop-yellow);color:var(--pop-ink);border:1.5px dashed var(--stroke);rotate:-1.5deg}
+html[data-style="abstract"] .tt-w b{font-weight:700}
+html[data-style="abstract"] .pw-t{font-weight:800}
+html[data-style="abstract"] .a2hs{background:var(--pop-cyan);color:var(--pop-ink);border:2px solid var(--stroke);box-shadow:var(--shadow-xs);font-weight:700}
+html[data-style="abstract"] .a2hs-t svg{color:var(--pop-ink)}
+html[data-style="abstract"] .a2hs .link-t{color:var(--pop-ink);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+html[data-style="abstract"] .a2hs-x{color:var(--pop-ink)}
+html[data-style="abstract"] .a2-n{background:var(--neon);color:var(--neon-ink);border:2px solid var(--stroke);font-weight:700}
+html[data-style="abstract"] .a2-pic{border:2px solid var(--stroke);box-shadow:var(--shadow-xs);background:var(--surface)}
+html[data-style="abstract"] .a2-pic .hl{outline:3px solid var(--accent)}
+html[data-style="abstract"] .a2-row.hl{background:var(--pop-yellow);color:var(--pop-ink)}
+html[data-style="abstract"] .a2-row.hl svg{color:var(--pop-ink)}
+html[data-style="abstract"] .a2-url{background:var(--sunk)}
+html[data-style="abstract"] .privacy-doc :is(.sum,section){border:2px solid var(--stroke);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .privacy-doc .sum{background:var(--ag-card)}
+html[data-style="abstract"] .privacy-doc h2{font-weight:800}
+html[data-style="abstract"] .inv-list{border:2px solid var(--stroke);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .tok-next{border:2px solid var(--stroke)}
+html[data-style="abstract"] .tok-next{background:var(--pop-yellow);color:var(--pop-ink);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .tok-next .meta{color:var(--pop-ink)}
+html[data-style="abstract"] .hb.na{background:var(--sunk);border:2px dashed var(--muted);box-shadow:none;rotate:none}
+html[data-style="abstract"] .hb.na .hb-n,html[data-style="abstract"] .hb.na .hb-v{color:var(--muted)}
+html[data-style="abstract"] .lp-cats .chip[aria-pressed="true"]{background:var(--pop-yellow);color:var(--pop-ink);border-color:var(--stroke)}
+html[data-style="abstract"] .lp-add{background:var(--neon);color:var(--neon-ink);border:2px solid var(--stroke)}
+@media (prefers-reduced-motion: reduce){html[data-style="abstract"] :is(.onb-icon,[data-step="hello"] .onb-card,.tag.tmp){rotate:none}}
+
+/* ---------- v6: 递减组, 训练历史, the watch ---------- */
+html[data-style="abstract"] .lv-set.drop{background:color-mix(in srgb,var(--pop-pink) 24%,var(--sunk))}
+html[data-style="abstract"] .lv-set.drop.focus{background:var(--surface)}
+html[data-style="abstract"] .lv-set.drop.done{background:var(--good-soft)}
+html[data-style="abstract"] .lv-set.drop .lv-sn{color:var(--plate-red)}
+html[data-style="abstract"] .lv-dradd{color:var(--plate-red)}
+html[data-style="abstract"] .lv-tip{background:var(--pop-cyan);color:var(--pop-ink);border:2px solid var(--stroke);box-shadow:var(--shadow-xs);font-weight:600}
+html[data-style="abstract"] .lv-tip-ic{border:1.5px solid var(--stroke);background:#fff;color:#111}
+html[data-style="abstract"] .lv-tip .link{color:var(--pop-ink);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+html[data-style="abstract"] .vd.dr{background:var(--pop-pink);color:var(--pop-ink)}
+html[data-style="abstract"] .xset.drop{background:color-mix(in srgb,var(--pop-pink) 35%,var(--surface))}
+html[data-style="abstract"] .xset.drop i{color:var(--pop-ink)}
+html[data-style="abstract"] .wr-hr small,html[data-style="abstract"] .hr-line small{border:1.5px solid var(--stroke);background:var(--surface);color:var(--ink);font-weight:800}
+html[data-style="abstract"] .hist{background-color:var(--bg);background-image:radial-gradient(var(--dots) 1.2px,transparent 1.7px);background-size:18px 18px}
+html[data-style="abstract"] .hs-top{background:var(--bg);border-bottom:2px solid var(--stroke);-webkit-backdrop-filter:none;backdrop-filter:none}
+html[data-style="abstract"] .hs-tt b{font-weight:800;-webkit-text-stroke:.3px currentColor}
+html[data-style="abstract"] .hs-mt{font-weight:700}
+html[data-style="abstract"] .hs-wk{color:var(--ink);font-weight:800}
+html[data-style="abstract"] button.hs-d.on{background:var(--pop-yellow);color:var(--pop-ink);border:1.5px solid var(--stroke)}
+html[data-style="abstract"] .hs-d.now .hs-dn{box-shadow:inset 0 0 0 2px var(--accent)}
+html[data-style="abstract"] .hs-sum{border-top:2px dashed var(--stroke)}
+html[data-style="abstract"] .hs-k b{font-weight:700}
+html[data-style="abstract"] .hs-k span{color:var(--ink);font-weight:700}
+html[data-style="abstract"] .hs-mo{font-weight:800}
+html[data-style="abstract"] .hs-card{border:2px solid var(--stroke);box-shadow:var(--shadow-s);transition:translate .08s,box-shadow .08s}
+html[data-style="abstract"] .hs-card:active{translate:2px 2px;box-shadow:var(--shadow-xs);background:var(--surface)}
+html[data-style="abstract"] .hs-t,html[data-style="abstract"] .hs-xn b{font-weight:800}
+html[data-style="abstract"] .hs-dt b,html[data-style="abstract"] .hs-ev{font-weight:700}
+html[data-style="abstract"] .hs-dt small{color:var(--ink);font-weight:700}
+html[data-style="abstract"] .hs-xb b{font-weight:700}
+html[data-style="abstract"] .hs-end{color:var(--ink);font-weight:600}
+html[data-style="abstract"] .dv-tbl tr.go td:first-child{color:var(--accent);font-weight:700}
+@media (prefers-reduced-motion: reduce){html[data-style="abstract"] .hs-card:active{translate:none}}
+html[data-style="abstract"] button.hs-d.on.now .hs-dn{color:var(--pop-ink);box-shadow:inset 0 0 0 2px var(--pop-ink)}
+
+/* ---------- v7: days by name, history in the card ---------- */
+html[data-style="abstract"] .lv-hist{border:1.5px solid var(--stroke)}
+html[data-style="abstract"] .hs-xp{border:1px solid var(--stroke);background:var(--surface);color:var(--ink)}
+html[data-style="abstract"] .hs-parts b{font-weight:800}
+html[data-style="abstract"] .lv-rx.rl .lv-k{background:var(--neon);color:var(--neon-ink)}
+html[data-style="abstract"] .rx-note.rl{color:var(--ink);font-weight:600}
+html[data-style="abstract"] .rx-src.rl{color:var(--muted);font-weight:700}
+/* ---------- v7.1: calmer set rows in 训练中 (colour and type stay; no hard shadows, no tilt, 1.5px strokes) ---------- */
+html[data-style="abstract"] .live .lv-set.focus{box-shadow:none}
+html[data-style="abstract"] .live .lv-set.warm{border-width:1.5px}
+html[data-style="abstract"] .live .lv-st{border-width:1.5px}
+html[data-style="abstract"] .live .lv-tick{border-width:1.5px;transition:none}
+html[data-style="abstract"] .live .lv-tick[aria-pressed="true"]{rotate:none;box-shadow:none}
+html[data-style="abstract"] .live .lv-sn small{rotate:none}
+html[data-style="abstract"] .live .lv-go-ck{rotate:none}
+html[data-style="abstract"] .lv-st input.lv-v::placeholder{color:var(--muted);opacity:1}
+html[data-style="abstract"] .lv-det{border:1.5px solid var(--stroke)}
+html[data-style="abstract"] .lv-why{font-weight:600}
+
+/* ---------- v7b: 计划管理 ---------- */
+html[data-style="abstract"] .dl-card{border:2px solid var(--stroke);box-shadow:var(--shadow-xs);background:var(--warn-soft);color:var(--ink)}
+html[data-style="abstract"] .dl-t b{font-weight:800}
+html[data-style="abstract"] .dl-t span{color:var(--ink)}
+html[data-style="abstract"] .lv-dl{border:1.5px solid var(--stroke);background:var(--pop-yellow);color:var(--pop-ink)}
+html[data-style="abstract"] .lv-rx.dl .lv-k{background:var(--pop-yellow);color:var(--pop-ink)}
+html[data-style="abstract"] .mus{border:1.5px solid var(--stroke);background:var(--surface);font-weight:600}
+html[data-style="abstract"] .mus b{font-weight:700}
+html[data-style="abstract"] .mus.low{border-style:dashed;border-color:var(--muted);color:var(--muted)}
+html[data-style="abstract"] .mus-say{font-weight:600}
+html[data-style="abstract"] .tp-guide{background:var(--pop-cyan);color:var(--pop-ink)}
+html[data-style="abstract"] .tp-gh b{font-weight:800}
+html[data-style="abstract"] .tp-guide .icon-btn{color:var(--pop-ink)}
+html[data-style="abstract"] :is(.de-more,.de-step){border:2px solid var(--stroke)}
+html[data-style="abstract"] .de-more summary{font-weight:800}
+html[data-style="abstract"] .de-step .de-n{font-weight:700}
+html[data-style="abstract"] .lv-rir{border:2px solid var(--stroke);background:var(--pop-yellow);color:var(--pop-ink);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .lv-rir-q b{color:var(--pop-ink)}
+html[data-style="abstract"] .lv-rir .lr-b{border:2px solid var(--stroke);background:var(--surface);color:var(--ink);font-weight:800}
+html[data-style="abstract"] .lv-rpe{color:var(--accent)}
+html[data-style="abstract"] .rp-line{border:1.5px dashed var(--stroke);background:var(--surface);color:var(--ink)}
+html[data-style="abstract"] .rp-t{color:var(--ink);font-weight:600}
+html[data-style="abstract"] .tp-pick{font-weight:800}
+html[data-style="abstract"] .tp-ht b{font-weight:800}
+html[data-style="abstract"] .tp-who{color:var(--ink)}
+html[data-style="abstract"] .tp-days{border-top:2px solid var(--stroke)}
+html[data-style="abstract"] .tp-day + .tp-day{border-top:2px dashed var(--sep)}
+html[data-style="abstract"] .tp-dh b,html[data-style="abstract"] .tp-exm b{font-weight:800}
+html[data-style="abstract"] .tp-last{font-weight:800}
+html[data-style="abstract"] .tp-how i{color:var(--accent);font-weight:700}
+html[data-style="abstract"] .tp-card.open{box-shadow:var(--shadow);border-color:var(--accent)}
+html[data-style="abstract"] .rx-note.dl{color:var(--warn);font-weight:700}
+
+/* ---------- v8: one 训练 tab ---------- */
+html[data-style="abstract"] .tr-exs{font-weight:800}
+html[data-style="abstract"] .tr-meta b{font-weight:800;color:var(--accent)}
+html[data-style="abstract"] .tag.dl{border:1.5px solid var(--stroke);background:var(--pop-yellow);color:var(--pop-ink)}
+html[data-style="abstract"] .pd-rt b{font-weight:800}
+html[data-style="abstract"] .wk-c{border:1.5px solid var(--stroke);background:var(--surface)}
+html[data-style="abstract"] .wk-c.on{background:var(--good-soft)}
+html[data-style="abstract"] .wk-c.plan{background:var(--accent-soft)}
+html[data-style="abstract"] .wk-c.now{box-shadow:inset 0 0 0 2px var(--accent)}
+html[data-style="abstract"] .wk-c .wv{font-weight:800}
+html[data-style="abstract"] .wk-ph,html[data-style="abstract"] .hx-row b,html[data-style="abstract"] .ds-t b{font-weight:800}
+html[data-style="abstract"] .ds-row[aria-pressed="true"]{background:var(--accent-soft)}
+html[data-style="abstract"] .lv-cons{border:1.5px solid var(--stroke);background:var(--pop-pink);color:var(--pop-ink)}
+html[data-style="abstract"] .dv-next{border:1.5px solid var(--stroke)}
+html[data-style="abstract"] .dv-next .by,html[data-style="abstract"] .dv-next .src{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .dv-next .dv-nx{font-weight:700}
+html[data-style="abstract"] .dv-next .why{font-weight:600}
+
+/* ---------- v9: the ✦ at the top, 「今天」, Claude on 今日, ＋, 我的 (app.js) ---------- */
+html[data-style="abstract"] .cl-btn{background:var(--neon);color:#111;border:2px solid var(--stroke);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .cl-btn[aria-current="page"]{background:#111;color:var(--neon);border-color:var(--stroke)}
+html[data-style="abstract"] .cl-btn .badge{box-shadow:none;top:-8px;right:-9px}
+html[data-style="abstract"] .top-back{color:var(--ink)}
+html[data-style="abstract"] .top-back svg{stroke-width:2.8}
+/* 「今天」 */
+html[data-style="abstract"] .tb-tr{border-left:2px dashed var(--sep)}
+html[data-style="abstract"] .tb-bot{border-top:2px dashed var(--sep)}
+html[data-style="abstract"] .tb-k{color:var(--ink);font-weight:800}
+html[data-style="abstract"] .tb-big b{font-size:40px;font-weight:700}
+html[data-style="abstract"] .tb-eat.over .tb-big b{color:var(--warn)}
+html[data-style="abstract"] .tb-sub b{font-weight:700}
+html[data-style="abstract"] .tb-v{font-weight:800;-webkit-text-stroke:.3px currentColor}
+html[data-style="abstract"] .tb-tmp{border:1.5px solid var(--stroke);background:var(--pop-yellow);color:var(--pop-ink);font-weight:800}
+html[data-style="abstract"] .tb-w b{font-weight:700}
+html[data-style="abstract"] .tb-add{border:2px solid var(--stroke);background:var(--pop-cyan);color:#111;font-weight:800;box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .tb-add:active{translate:1px 1px;box-shadow:none}
+html[data-style="abstract"] .tb-hb i{border:2px solid var(--stroke)}
+html[data-style="abstract"] .tb-hb i.ok{background:var(--neon)}
+html[data-style="abstract"] .tb-hb i.na{border-style:dashed;opacity:.45}
+html[data-style="abstract"] .past-line{color:var(--ink);font-weight:600}
+html[data-style="abstract"] .past-line b{font-weight:700}
+/* Claude on 今日: the neon card, its rows split by dashes */
+html[data-style="abstract"] .cb > * + *,html[data-style="abstract"] .cb > .ag-sec{border-top:2px dashed color-mix(in srgb,var(--ink) 35%,transparent)}
+html[data-style="abstract"] .cb > .ag-sec:first-child{border-top:0}
+html[data-style="abstract"] .cb-rt b,html[data-style="abstract"] .cb-line > span:not(.ag-mark),html[data-style="abstract"] .cb-am b{font-weight:800}
+html[data-style="abstract"] :is(.cb-rep,.cb-line) svg.chev{color:var(--ink)}
+html[data-style="abstract"] .cb-line small,html[data-style="abstract"] .cb-am small{color:var(--ink);opacity:.75}
+html[data-style="abstract"] .cb-ar + .cb-ar{border-top-color:color-mix(in srgb,var(--ink) 18%,transparent)}
+html[data-style="abstract"] .cb-solo .todo-more{color:var(--ink)}
+html[data-style="abstract"] .hl-new{animation-name:hlnew-a}
+@keyframes hlnew-a{0%,35%{background:var(--hl-ag)}100%{background:transparent}}
+/* 饮食's head */
+html[data-style="abstract"] .mh{border-bottom:2px dashed var(--sep)}
+html[data-style="abstract"] .mh-m{color:var(--ink)}
+html[data-style="abstract"] .mh-m b{font-weight:700}
+html[data-style="abstract"] .mh-tg{font-weight:800;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+html[data-style="abstract"] .mh-q{border:2px solid var(--stroke);color:var(--ink);font-weight:800;background:var(--pop-yellow)}
+/* 身体: the weigh-in and the morning check as rows of the card */
+html[data-style="abstract"] .panel > .weigh,html[data-style="abstract"] .panel > .feel-line{border-bottom:2px dashed var(--sep)}
+html[data-style="abstract"] .feel-line.fl-ask .fl-t{color:var(--accent)}
+html[data-style="abstract"] .feel-line svg.chev{color:var(--ink)}
+/* ＋: four sticker buttons, the rest in a line */
+html[data-style="abstract"] .mn-t{background:var(--surface);border:2px solid var(--stroke);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .mn-t .mi,html[data-style="abstract"] .mn-live .mi{border:2px solid var(--stroke);color:#111;box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .mn-cam .mi{background:var(--accent);color:var(--accent-ink);rotate:-5deg}
+html[data-style="abstract"] .mn-quick .mi{background:var(--pop-yellow)}
+html[data-style="abstract"] .mn-water .mi{background:var(--pop-cyan)}
+html[data-style="abstract"] .mn-weigh .mi{background:var(--pop-pink)}
+html[data-style="abstract"] :is(.mn-main b,.mn-h b,.mn-live b){font-weight:800}
+html[data-style="abstract"] .mn-sub,html[data-style="abstract"] .mn-more-b{font-weight:800;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+html[data-style="abstract"] .mn-w{border:2px solid var(--stroke);background:var(--pop-cyan);color:#111;font-weight:800}
+html[data-style="abstract"] .mn-w:active,html[data-style="abstract"] .mn-t:active{translate:1px 1px}
+html[data-style="abstract"] .mn-live{background:var(--pop-pink);color:#111;border:2px solid var(--stroke);box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .mn-live small,html[data-style="abstract"] .mn-live svg.chev{color:#111}
+html[data-style="abstract"] .mn-live .mi{background:#fff;rotate:4deg}
+html[data-style="abstract"] .mn-more{color:var(--ink)}
+html[data-style="abstract"] .mn-more-k{font-weight:800}
+/* 我的 */
+html[data-style="abstract"] .me-g > * + *{border-top:1px solid var(--sep)}
+html[data-style="abstract"] .me-rt b{font-weight:800}
+html[data-style="abstract"] .me-row svg.chev{color:var(--ink)}
+html[data-style="abstract"] .me-row.hl b{color:var(--accent)}
+html[data-style="abstract"] .me-row.danger b{color:var(--danger)}
+/* 训练: 改 on a plan day's exercise */
+html[data-style="abstract"] .pex-ed{border:2px solid var(--stroke);color:var(--ink);font-weight:800;box-shadow:var(--shadow-xs)}
+html[data-style="abstract"] .pex-ed:active{translate:1px 1px;box-shadow:none}
+@media (prefers-reduced-motion: reduce){
+  html[data-style="abstract"] :is(.tb-add,.mn-w,.mn-t,.pex-ed):active{translate:none!important}
+}
+@media (max-width:360px){
+  html[data-style="abstract"] .tb-big b{font-size:34px}
+  html[data-style="abstract"] .tb-hb i{border-width:1.5px}
+}
+html[data-style="abstract"] :is(.cb-fl,.cb-plus,.todo-all){color:var(--ink);font-weight:800}
+html[data-style="abstract"] .cb-fl span{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+html[data-style="abstract"] .cb-fl svg.chev,html[data-style="abstract"] .cb-fx{color:var(--ink)}
+html[data-style="abstract"] .tb-big b{font-size:37px}

@@ -1,0 +1,533 @@
+#!/usr/bin/env python3
+"""xunji — bridge between 训记 (the workout app the user logs training in) and 薄肌研究所.
+
+Keys: ~/.config/lianshiji/xunji.json  {"accounts": {"<薄肌研究所 username>": {"train_key": "xjllm_…", "template_key": "xjtpl_…"}}}
+Never print the keys. Raw 训记 responses are cached in ~/.cache/lianshiji/xunji/<username>/.
+
+  xunji accounts                     薄肌研究所 usernames that have 训记 keys
+  xunji sync -u alice                 import 训记 sessions into 薄肌研究所 workouts (default: from 2 days before the last sync,
+                                      at least the last 14 days; first sync: 30 days)
+  xunji sync -u alice --days 90       a longer window; sessions older than 7 days come in as history (no review requested)
+  xunji sync -u alice --allow-deletes let one sync delete more than 3 imported workouts that are gone from 训记
+  xunji trains 2026-01-05 -u alice    one day's raw 训记 training data (full detail)
+  xunji plans -u alice                训记 official plans; xunji plan universal:1 -u alice [--start D --end D]
+  xunji templates -u alice            the Agent template folder (the only templates the API can see or change)
+  xunji templates-mutate FILE -u alice              print what the mutation would change; sends nothing
+  xunji templates-mutate FILE -u alice --propose --title "把 4 个训练日写进训记" --why "…" [--days '{"lsj-A": "A"}']
+                                      checks it the same way, then puts it in the person's 薄肌研究所 inbox (kind xunji) for
+                                      them to accept on the page, which sends it with the template key stored on the
+                                      server. --days ties upserts (client_id or template_id) to plan days. An older open
+                                      xunji proposal becomes stale. Refused when meta/xunji.templates is "declined".
+                                      Uses bin/lsj's config; needs no 训记 key here.
+  xunji templates-mutate FILE -u alice --confirmed  send it from here — only after the user has said yes to that summary
+  xunji movements 卧推                 search 训记's official movement names
+
+Deleting: an imported workout is deleted only when two 训记 reads of its day at least 10 minutes apart both lack it
+(so usually on the second sync), never more than 3 in one sync without --allow-deletes, and each deleted record is
+saved first to ~/.cache/lianshiji/xunji/trash/<date>-<id>.json. The report lists what was deleted and what was held back.
+
+How a 训记 session becomes a workout, and the checks on a template change, live in app/xunji_import.py (shared with the
+server's 「从训记同步」 and 「写进训记」).
+Dates follow the account's time zone and day start as the server lists them (lsj users: tz, dayStartHour).
+
+Exit codes: 0 ok, 1 usage/config error, 2 训记 or 薄肌研究所 error, 3 薄肌研究所 version conflict (run sync again).
+"""
+import argparse
+import datetime as dt
+import hashlib
+import http.client
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'app'))  # the mapping is shared with the server: app/xunji_import.py
+import xunji_import as xi  # noqa: E402
+from xunji_import import API, TRAINS, iso_ms, merge_session  # noqa: E402
+from xunji_import import content_hash, map_train, num, session_date, to_kg, xunji_hash  # noqa: E402,F401  (the tests use them from here)
+
+KEYS = os.path.expanduser('~/.config/lianshiji/xunji.json')
+CACHE = os.path.expanduser('~/.cache/lianshiji/xunji')
+MOVEMENTS_URL = 'https://raw.githubusercontent.com/Foveluy/Xunji-movements/main/README.md'
+REVIEW_WINDOW_DAYS = 7  # imported sessions newer than this ask Claude for a review
+RECHECK_DAYS = 14       # every sync re-reads at least this many recent days, to catch late edits and deletions
+REFETCH_SEC = 600       # a day's cache younger than this is reused; an unsettled one older than this is read again
+CONFIRM_MISSING_SEC = 600  # a workout gone from 训记 is deleted when two reads this far apart both lack it
+MAX_DELETES = 3         # per sync, unless --allow-deletes
+FETCH_PAUSE = 0.3       # seconds between 训记 requests
+MAX_TITLE = 24          # characters in a proposal's title
+
+
+def die(msg, code=1):
+    print(msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def out(obj):
+    print(json.dumps(obj, ensure_ascii=False, indent=1))
+
+
+def load_lsj():
+    loader = importlib.machinery.SourceFileLoader('lsj', os.path.join(HERE, 'lsj'))
+    spec = importlib.util.spec_from_loader('lsj', loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+def account(name):
+    try:
+        with open(KEYS, encoding='utf-8') as f:
+            accts = json.load(f)['accounts']
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        die(f'cannot read {KEYS}: {e.__class__.__name__}')
+    if not name:
+        if len(accts) != 1:
+            die('pass -u <username>; linked accounts: ' + ', '.join(accts))
+        name = next(iter(accts))
+    if name not in accts:
+        die(f'{name} has no 训记 keys; linked accounts: ' + ', '.join(accts))
+    return name, accts[name]
+
+
+def write_json_atomic(path, obj, mtime=None):
+    """Write next to the target and rename over it, so a crash never leaves half a file."""
+    d = os.path.dirname(path)
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix='.' + os.path.basename(path) + '.', suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(obj, f, ensure_ascii=False)
+        if mtime is not None:
+            os.utime(tmp, (mtime, mtime))
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def post(url, body, key):
+    """POST to 训记 (app/xunji_import.py); one wait-and-retry on rate limiting. Failures exit 2."""
+    try:
+        return xi.post(url, body, key, on_wait=lambda s: print(f'训记 rate limit, waiting {s:.0f}s', file=sys.stderr))
+    except xi.XunjiError as e:
+        die(str(e), 2)
+
+
+# ---------------------------------------------------------------- reading trains
+
+def fetch_trains(key, date, full):
+    """One day of sessions from 训记 (network). A response without res.trains is an error, never "no sessions"."""
+    try:
+        return xi.trains_from(post(TRAINS + '/api_trains_for_llm_v2', xi.trains_request(date, full), key), date)
+    except xi.XunjiError as e:
+        die(f'{e}; nothing cached or changed', 2)
+
+
+def cache_path(user, date, full):
+    return os.path.join(CACHE, user, f'{date}-{"full" if full else "light"}.json')
+
+
+def read_cache(path):
+    """(trains, mtime) from a cache file, or (None, None) when it is missing or unreadable (then it is fetched again)."""
+    try:
+        mtime = os.path.getmtime(path)
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None, None
+    if not isinstance(data, list) or not all(isinstance(t, dict) for t in data):
+        return None, None
+    return data, mtime
+
+
+def _ids(trains):
+    return {str(t.get('localid')) for t in trains if t.get('localid') is not None}
+
+
+def read_day(user, key, date, full, refresh=False, expect=(), confirm=(), now=None):
+    """One day of 训记 sessions, cached on disk: (trains, when they were fetched).
+    A cached day is final when it was fetched at least two days after that date (the user may log or edit a session
+    late); anything fetched earlier is read again once it is more than 10 minutes old.
+    expect: localids known to exist (from a fresher light read): a cache lacking one is read again now.
+    confirm: localids imported into 薄肌研究所 for this day: a cache lacking one is not final (read again after 10 minutes)."""
+    now = time.time() if now is None else now
+    path = cache_path(user, date, full)
+    cached, mtime = (None, None) if refresh else read_cache(path)
+    if cached is not None:
+        ids = _ids(cached)
+        settled = dt.date.fromtimestamp(mtime) >= dt.date.fromisoformat(date) + dt.timedelta(days=2)
+        young = now - mtime < REFETCH_SEC
+        lacks_expected = any(str(i) not in ids for i in expect)
+        lacks_local = any(str(i) not in ids for i in confirm)
+        if not lacks_expected and (young or (settled and not lacks_local)):
+            return cached, mtime
+    trains = fetch_trains(key, date, full)
+    write_json_atomic(path, trains, mtime=now)
+    if FETCH_PAUSE:
+        time.sleep(FETCH_PAUSE)
+    return trains, now
+
+
+def fetch_day(user, key, date, refresh=False, local_ids=(), now=None):
+    """A day's full sessions and when that answer was fetched. The light list says whether there is anything to read."""
+    light, at = read_day(user, key, date, False, refresh, confirm=local_ids, now=now)
+    if not light:
+        return [], at
+    return read_day(user, key, date, True, refresh, expect=_ids(light), confirm=local_ids, now=now)
+
+
+def chunks(ops, max_ops=100, max_bytes=600_000):
+    """Split writes into batches the server accepts (≤200 ops, ≤1 MiB)."""
+    batch, size = [], 0
+    for op in ops:
+        n = len(json.dumps(op, ensure_ascii=False).encode())
+        if batch and (len(batch) >= max_ops or size + n > max_bytes):
+            yield batch
+            batch, size = [], 0
+        batch.append(op)
+        size += n
+    if batch:
+        yield batch
+
+
+def missing_path(user):
+    return os.path.join(CACHE, user, 'missing.json')
+
+
+def load_missing(user):
+    """{workout id: {"day": 训记 day, "since": when a 训记 read of that day first lacked it}}."""
+    try:
+        with open(missing_path(user), encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_trash(w, user, now):
+    """Keep a deleted workout: ~/.cache/lianshiji/xunji/trash/<date>-<id>.json (never overwritten)."""
+    base = os.path.join(CACHE, 'trash', f'{w["data"].get("date") or "nodate"}-{w["id"]}')
+    path, n = base + '.json', 1
+    while os.path.exists(path):
+        n += 1
+        path = f'{base}-{n}.json'
+    write_json_atomic(path, {'user': user, 'deletedAt': iso_ms(now * 1000), 'record': w})
+    return path
+
+
+def day_start_of(acct):
+    """The account's day start hour from the server's user listing; the default when the server is older."""
+    h = acct.get('dayStartHour')
+    return h if isinstance(h, int) and not isinstance(h, bool) and 0 <= h <= 23 else xi.DAY_START_HOUR
+
+
+def sync(client, user, key, since=None, days=None, refresh=False, allow_deletes=False, today=None, now=None):
+    """Import 训记 sessions into the account `client` acts for. Returns the report.
+    The time zone and day start are the account's, as the server lists them (client.user tz / dayStartHour)."""
+    now = time.time() if now is None else now
+    acct = getattr(client, 'user', None) or {}
+    tz, day_start = xi.tz_of(acct.get('tz')), day_start_of(acct)
+    today = today or dt.datetime.fromtimestamp(now, tz).date()  # 训记's calendar day: its sessions are filed by it
+    now_iso = iso_ms(now * 1000)
+    meta = client.get('meta', 'xunji')
+    meta_data = (meta or {}).get('data') or {}
+    if since:
+        since = dt.date.fromisoformat(since) if isinstance(since, str) else since
+    elif days:
+        since = today - dt.timedelta(days=days - 1)
+    elif meta_data.get('lastSyncDate'):
+        since = min(dt.date.fromisoformat(meta_data['lastSyncDate']) - dt.timedelta(days=2),
+                    today - dt.timedelta(days=RECHECK_DAYS - 1))
+    else:
+        since = today - dt.timedelta(days=29)
+    since = min(since, today)
+    day_map = meta_data.get('dayMap') or {}
+    plan = (client.get('plan', 'current') or {}).get('data')
+    window = [(since + dt.timedelta(days=i)).isoformat() for i in range((today - since).days + 1)]
+
+    # what is already imported: `known` by id (any date), `have` by the 训记 day it came from (inside the window)
+    have, known = {}, {}
+    for w in client.list('workouts', ['date:gte:' + json.dumps((since - dt.timedelta(days=1)).isoformat())], 'date', limit=5000):
+        if w['data'].get('source') == 'xunji' and w['id'].startswith('xj-'):
+            known[w['id']] = w
+            day = (w['data'].get('xunji') or {}).get('day') or w['data'].get('date')
+            if isinstance(day, str) and window[0] <= day <= window[-1]:
+                have.setdefault(day, {})[w['id']] = w
+
+    # 1. read every day first, so a session moved to another day is seen before anything is deleted
+    sessions, fetched_at = {}, {}  # doc id -> (训记 day, raw session, fetched at)
+    for ds in window:
+        trains, at = fetch_day(user, key, ds, refresh, local_ids=[i[3:] for i in have.get(ds, {})], now=now)
+        fetched_at[ds] = at
+        for t in trains:
+            if t.get('localid') is None:
+                continue
+            doc_id = f'xj-{t["localid"]}'
+            prev = sessions.get(doc_id)
+            if prev is None or (at, ds) >= (prev[2], prev[0]):  # listed on two days: the fresher read wins
+                sessions[doc_id] = (ds, t, at)
+
+    # 2. write what changed
+    review_from = (today - dt.timedelta(days=REVIEW_WINDOW_DAYS)).isoformat()
+    ops = []
+    report = {'user': user, 'range': [window[0], window[-1]], 'new': [], 'updated': [], 'remapped': [], 'deleted': [],
+              'heldBack': [], 'unchanged': 0, 'days': len(window)}
+    for doc_id, (ds, t, _) in sorted(sessions.items(), key=lambda kv: (kv[1][0], kv[0])):
+        cur = known.get(doc_id) or client.get('workouts', doc_id)
+        # a 训记 edit asks for a (new) review; a plan / dayMap / mine / mapping change only rewrites the record
+        body, change, label = merge_session(t, cur, day_map, plan, ds >= review_from, now_iso, tz, day_start)
+        if body is None:
+            report['unchanged'] += 1
+            continue
+        ops.append({'op': 'set', 'collection': 'workouts', 'id': doc_id, 'data': body, 'ifVersion': cur['version'] if cur else 0})
+        report[change].append(label)
+
+    # 3. imported workouts that no read in the window lists any more
+    missing = load_missing(user)
+    gone = {doc_id: (day, w) for day, ws in have.items() for doc_id, w in ws.items() if doc_id not in sessions}
+    ready = []
+    for doc_id, (day, w) in sorted(gone.items(), key=lambda kv: (kv[1][0], kv[0])):
+        label = f'{w["data"].get("date")} {w["data"].get("title") or "训练"} ({doc_id})'
+        first = (missing.get(doc_id) or {}).get('since')
+        if not isinstance(first, (int, float)) or fetched_at[day] < first:
+            missing[doc_id] = {'day': day, 'since': fetched_at[day]}
+            report['heldBack'].append(f'{label}: 训记 no longer lists it; deleted if a read ≥10 minutes later agrees')
+        elif fetched_at[day] - first < CONFIRM_MISSING_SEC:
+            report['heldBack'].append(f'{label}: waiting for a second 训记 read ≥10 minutes after the first')
+        else:
+            ready.append((doc_id, w, label))
+    missing = {k: v for k, v in missing.items() if k in gone}  # back in 训记, or outside the window: forget it
+    if len(ready) > MAX_DELETES and not allow_deletes:
+        report['heldBack'] += [f'{label}: more than {MAX_DELETES} deletions in one sync; check 训记, then sync with --allow-deletes'
+                               for _, _, label in ready]
+        ready = []
+    for doc_id, w, label in ready:
+        save_trash(w, user, now)
+        ops.append({'op': 'delete', 'collection': 'workouts', 'id': doc_id, 'ifVersion': w['version']})
+        report['deleted'].append(label)
+    write_json_atomic(missing_path(user), missing)
+
+    ops.append({'op': 'set', 'collection': 'meta', 'id': 'xunji', 'data': {
+        **meta_data, 'linked': True, 'lastSyncAt': now_iso, 'lastSyncDate': today.isoformat(),
+        'imported': meta_data.get('imported', 0) + len(report['new'])}, 'ifVersion': meta['version'] if meta else 0})
+    for part in chunks(ops):
+        client.batch(part)
+    if ready:
+        write_json_atomic(missing_path(user), {k: v for k, v in missing.items() if k not in {r[0] for r in ready}})
+    return report
+
+
+def cmd_sync(a):
+    user, keys = account(a.user)
+    lsj = load_lsj()
+    try:
+        client = lsj.Client.from_config().for_user(user)
+        report = sync(client, user, keys['train_key'], since=a.since, days=a.days, refresh=a.refresh,
+                      allow_deletes=a.allow_deletes)
+    except lsj.LsjError as e:
+        hint = ' (someone changed a record during the sync: run it again)' if e.code == 3 else ''
+        die(f'薄肌研究所: {e}{hint}', e.code)
+    for line in report['deleted']:
+        print('deleted', line, file=sys.stderr)
+    for line in report['heldBack']:
+        print('held back', line, file=sys.stderr)
+    out(report)
+
+
+# ---------------------------------------------------------------- plans, templates, movements
+
+def movement_names():
+    path = os.path.join(CACHE, 'movements.md')
+    if not os.path.exists(path) or time.time() - os.path.getmtime(path) > 7 * 86400:
+        try:
+            with urllib.request.urlopen(MOVEMENTS_URL, timeout=30) as r:
+                body = r.read()
+            os.makedirs(CACHE, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(dir=CACHE, prefix='.movements.', suffix='.tmp')
+            with os.fdopen(fd, 'wb') as f:
+                f.write(body)
+            os.replace(tmp, path)
+        except (urllib.error.URLError, http.client.HTTPException, OSError) as e:
+            if not os.path.exists(path):
+                die(f'cannot download the 训记 movement list: {getattr(e, "reason", None) or e.__class__.__name__}', 2)
+    names = []
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            m = re.match(r'^\|\s*\d+\s*\|\s*(.+?)\s*\|\s*$', line)
+            if m:
+                names.append(m.group(1))
+    return names
+
+
+def summarize_mutation(body, official):
+    """(summary lines, problems): app/xunji_import.py's check, with the official movement names."""
+    return xi.summarize_mutation(body, official)
+
+
+def propose_days(arg, body):
+    """--days as {upsert client_id or template_id: plan day id}; every key must name one of the mutation's upserts."""
+    try:
+        days = json.loads(arg)
+    except ValueError as e:
+        die(f'--days is not JSON: {e}')
+    if not isinstance(days, dict) or not all(isinstance(k, str) and isinstance(v, str) and v for k, v in days.items()):
+        die('--days takes {"<client_id or template_id>": "<plan day id>", …}')
+    ids = {str(u[k]) for u in body.get('upserts') or [] if isinstance(u, dict) for k in ('client_id', 'template_id') if u.get(k) is not None}
+    unknown = sorted(set(days) - ids)
+    if unknown:
+        die('--days names no upsert of this mutation: ' + ', '.join(unknown))
+    return days
+
+
+def propose(a, body, lines):
+    """Put the checked mutation into the person's inbox as an open kind-xunji proposal; an older open one goes stale.
+    Nothing is sent to 训记: the person accepts it on the page, and the server sends it with their template key."""
+    title, why = (a.title or '').strip(), (a.why or '').strip()
+    if a.confirmed:
+        die('--propose and --confirmed: pick one (--propose leaves sending to the page)')
+    if not title or not why:
+        die('--propose needs --title and --why')
+    if len(title) > MAX_TITLE:
+        die(f'--title is at most {MAX_TITLE} characters')
+    days = propose_days(a.plan_days, body) if a.plan_days else None
+    lsj = load_lsj()
+    try:
+        client = lsj.Client.from_config().for_user(a.user)
+        meta = ((client.get('meta', 'xunji') or {}).get('data') or {})
+        if meta.get('templates') == 'declined':
+            die(f'{client.user["username"]} said no to 训记 templates (meta/xunji.templates is "declined"): nothing proposed. '
+                'Only if they asked for it again, clear that first.')
+        if days:
+            plan = (client.get('plan', 'current') or {}).get('data') or {}
+            plan_ids = {d.get('id') for d in (plan.get('training') or {}).get('days') or [] if isinstance(d, dict)}
+            bad = sorted({v for v in days.values() if v not in plan_ids})
+            if bad:
+                die('--days names plan days that plan/current does not have: ' + ', '.join(bad))
+        older = client.list('inbox', ['kind:eq:"xunji"', 'status:eq:"open"'])
+        now = time.time()
+        stamp = dt.datetime.fromtimestamp(now, xi.tz_of(client.user.get('tz'))).strftime('%Y%m%d-%H%M%S')
+        new_id = f'tpl-{stamp}-{os.urandom(2).hex()}'
+        doc = {'kind': 'xunji', 'title': title, 'why': why, 'createdAt': iso_ms(now * 1000), 'by': 'claude', 'status': 'open',
+               'needsReview': False, 'mutation': {k: v for k, v in body.items() if k not in ('confirmed', 'mutation_id')},
+               'summary': [x.strip() for x in lines]}
+        if days:
+            doc['days'] = days
+        ops = [{'op': 'set', 'collection': 'inbox', 'id': new_id, 'data': doc, 'ifVersion': 0}]
+        ops += [{'op': 'update', 'collection': 'inbox', 'id': d['id'], 'data': {'status': 'stale', 'replacedBy': new_id},
+                 'ifVersion': d['version']} for d in older]
+        client.batch(ops)
+    except lsj.LsjError as e:
+        die(f'薄肌研究所: {e}', e.code)
+    out({'user': client.user['username'], 'inbox': new_id, 'stale': [d['id'] for d in older]})
+
+
+def cmd_templates_mutate(a):
+    try:
+        with open(a.file, encoding='utf-8') as f:
+            body = json.load(f)
+    except (OSError, ValueError) as e:
+        die(f'cannot read {a.file}: {e}')
+    if not isinstance(body, dict):
+        die(f'{a.file}: the mutation must be a JSON object')
+    if not a.propose and (a.title or a.why or a.plan_days):
+        die('--title, --why and --days go with --propose')
+    lines, problems = summarize_mutation(body, set(movement_names()))
+    print('\n'.join(lines), file=sys.stderr if a.propose else sys.stdout)
+    if problems:
+        die('不能提交：\n- ' + '\n- '.join(problems))
+    if a.propose:
+        propose(a, body, lines)
+        return
+    user, keys = account(a.user)
+    if not a.confirmed:
+        print('\n（只是预览，没有提交。用户确认后加 --confirmed 再运行。）')
+        return
+    body['confirmed'] = True
+    body.setdefault('mutation_id', 'lsj-' + hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:20])
+    out(post(TRAINS + '/api_agent_templates_mutate_for_llm_v1', body, keys['template_key']))
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):  # usage errors exit 1; 2 means 训记 or 薄肌研究所 failed
+        self.print_usage(sys.stderr)
+        self.exit(1, f'{self.prog}: error: {message}\n')
+
+
+def main():
+    common = Parser(add_help=False)
+    common.add_argument('-u', '--user', help='薄肌研究所 username whose 训记 keys to use')
+    ap = Parser(prog='xunji', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest='cmd', required=True)
+    sub.add_parser('accounts')
+    p = sub.add_parser('sync', parents=[common])
+    p.add_argument('--since'); p.add_argument('--days', type=int); p.add_argument('--refresh', action='store_true')
+    p.add_argument('--allow-deletes', action='store_true', help=f'allow more than {MAX_DELETES} deletions in this sync')
+    p = sub.add_parser('trains', parents=[common]); p.add_argument('date'); p.add_argument('--refresh', action='store_true')
+    sub.add_parser('plans', parents=[common])
+    p = sub.add_parser('plan', parents=[common]); p.add_argument('ref'); p.add_argument('--start'); p.add_argument('--end')
+    p.add_argument('--no-movements', action='store_true')
+    sub.add_parser('templates', parents=[common])
+    p = sub.add_parser('templates-mutate', parents=[common]); p.add_argument('file'); p.add_argument('--confirmed', action='store_true')
+    p.add_argument('--propose', action='store_true', help="put it in the person's 薄肌研究所 inbox for them to accept on the page")
+    p.add_argument('--title', help='with --propose: what the page shows (≤24 characters)')
+    p.add_argument('--why', help='with --propose: 1–3 sentences on why')
+    p.add_argument('--days', dest='plan_days', help='with --propose: JSON {"<client_id or template_id>": "<plan day id>"}')
+    p = sub.add_parser('movements'); p.add_argument('query', nargs='?', default='')
+    a = ap.parse_args()
+    for d in (getattr(a, 'since', None), getattr(a, 'date', None)):
+        if d:
+            try:
+                dt.date.fromisoformat(d)
+            except ValueError:
+                ap.error(f'{d!r} is not a YYYY-MM-DD date')
+    if getattr(a, 'days', None) is not None and a.days < 1:
+        ap.error('--days must be at least 1')
+    if getattr(a, 'since', None) and a.since > dt.date.today().isoformat():
+        ap.error('--since is in the future')
+
+    if a.cmd == 'accounts':
+        try:
+            with open(KEYS, encoding='utf-8') as f:
+                print('\n'.join(json.load(f)['accounts']))
+        except (OSError, ValueError, KeyError, TypeError):
+            pass  # no 训记 linked
+    elif a.cmd == 'sync':
+        cmd_sync(a)
+    elif a.cmd == 'trains':
+        user, keys = account(a.user)
+        out(read_day(user, keys['train_key'], a.date, full=True, refresh=a.refresh)[0])
+    elif a.cmd == 'plans':
+        _, keys = account(a.user)
+        out(post(API + '/open/plan/query_gzip', {'schema_version': 'plan_open_api_v1', 'action': 'list'}, keys['train_key']).get('res'))
+    elif a.cmd == 'plan':
+        _, keys = account(a.user)
+        body = {'schema_version': 'plan_open_api_v1', 'action': 'get', 'plan_ref': a.ref, 'include_movements': not a.no_movements}
+        if a.start:
+            body['start_date'] = a.start
+        if a.end:
+            body['end_date'] = a.end
+        out(post(API + '/open/plan/query_gzip', body, keys['train_key']).get('res'))
+    elif a.cmd == 'templates':
+        _, keys = account(a.user)
+        out(post(TRAINS + '/api_agent_templates_sync_for_llm_v2', {'template_versions': {}}, keys['template_key']))
+    elif a.cmd == 'templates-mutate':
+        cmd_templates_mutate(a)
+    elif a.cmd == 'movements':
+        names = movement_names()
+        hits = [n for n in names if a.query in n] if a.query else names
+        print('\n'.join(hits[:200]) or '没有找到')
+
+
+if __name__ == '__main__':
+    main()

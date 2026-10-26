@@ -1,0 +1,12 @@
+# 薄肌研究所 backups, into /var/lib/lianshiji/backups/ (the same disk: copy them elsewhere too, see deploy/README.md).
+#  - daily 04:30: SQLite snapshot data-YYYY-MM-DD.db, switched to journal_mode=DELETE so the copy is one
+#    self-contained file (sqlite leaves a stale -shm behind when switching, so it is removed); data-* files
+#    (including any -wal/-shm) older than 14 days are removed
+#  - Sundays 04:45: photos-YYYY-MM-DD.tar.gz of photos/, the last 4 are kept
+#  - daily 04:30 too: a copy of vapid.json (the push-notification key; losing it ends every phone's subscription)
+# Install as /etc/cron.d/lianshiji-backup (root-owned, mode 644). The installed name must not contain a dot:
+# Debian/Ubuntu cron skips files in /etc/cron.d whose names contain one, so a copy named lianshiji-backup.cron
+# would silently never run. Needs the sqlite3 command-line tool.
+SHELL=/bin/sh
+30 4 * * * lianshiji umask 077 && cd /var/lib/lianshiji && mkdir -p backups && f=backups/data-$(date +\%F).db && sqlite3 data.db ".backup $f" && sqlite3 "$f" "PRAGMA journal_mode=DELETE;" >/dev/null && rm -f "$f-shm" "$f-wal" && find backups -name 'data-*' -mtime +14 -delete && { [ ! -f vapid.json ] || cp -p vapid.json backups/vapid.json; }
+45 4 * * 0 lianshiji umask 077 && cd /var/lib/lianshiji && mkdir -p backups && tar -czf backups/.photos.tmp photos && mv backups/.photos.tmp backups/photos-$(date +\%F).tar.gz && find backups -name 'photos-*.tar.gz' -mtime +27 -delete

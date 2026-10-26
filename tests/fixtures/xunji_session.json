@@ -1,0 +1,27 @@
+{
+ "_comment": "Synthetic 训记 session in the shape api_trains_for_llm_v2 returns with include_full_data (made-up values). One movement per exetype.",
+ "localid": 900001, "datestr": "2026-10-14", "title": "上肢 A", "note": "{\"text\":\"状态不错\",\"calorie\":\"320\"}",
+ "start": 1792000000000, "end": 1792004200000, "started_at": "", "ended_at": "", "truncated": false,
+ "heartRate": {"avg": 118, "max": 151, "min": 88},
+ "movements": [
+  {"index": 1, "name": "杠铃卧推", "type": "", "exetype": "", "truncated": false, "note": "", "restTime": 120, "sets": [
+   {"index": 1, "done": true, "weight": "40", "unit": "kg", "reps": "10", "time": 0, "timeLabel": "", "selfWeight": false, "rpe": "", "note": "", "comment": "", "setType": "热"},
+   {"index": 2, "done": true, "weight": "60", "unit": "kg", "reps": "8", "time": 118, "timeLabel": "1m58s", "selfWeight": false, "rpe": "8", "note": "", "comment": "", "setType": "递",
+    "dropSets": [{"index": 1, "weight": "45", "unit": "kg", "reps": "6"}]},
+   {"index": 3, "done": false, "weight": "135", "unit": "lbs", "reps": "6", "time": 0, "timeLabel": "", "selfWeight": false, "rpe": "", "note": "", "comment": "", "setType": ""}]},
+  {"index": 2, "name": "反手弯举", "type": "二头", "exetype": "weight", "truncated": false, "note": "", "restTime": 90, "sets": [
+   {"index": 1, "done": true, "weight": "7.5", "unit": "kg", "reps": "12", "time": 90, "timeLabel": "1m30s", "selfWeight": false, "rpe": "", "note": "", "comment": "", "setType": ""}]},
+  {"index": 3, "name": "双杠臂屈伸", "type": "", "exetype": "plus_weight", "truncated": false, "note": "", "restTime": 100, "sets": [
+   {"index": 1, "done": true, "weight": "", "unit": "kg", "reps": "10", "time": 0, "timeLabel": "", "selfWeight": false, "rpe": "", "note": "", "comment": "", "setType": ""},
+   {"index": 2, "done": true, "weight": "10", "unit": "kg", "reps": "8", "time": 100, "timeLabel": "1m40s", "selfWeight": false, "rpe": "", "note": "", "comment": "", "setType": ""},
+   {"index": 3, "done": true, "weight": "0", "unit": "kg", "reps": "8", "time": 100, "timeLabel": "1m40s", "selfWeight": false, "rpe": "", "note": "", "comment": "", "setType": ""}]},
+  {"index": 4, "name": "卷腹", "type": "", "exetype": "times", "truncated": false, "note": "", "restTime": 60, "sets": [
+   {"index": 1, "done": true, "weight": "", "unit": "kg", "reps": "15", "time": 60, "timeLabel": "1m0s", "selfWeight": false, "rpe": "", "note": "", "comment": "", "setType": ""}]},
+  {"index": 5, "name": "引体向上（辅助）", "type": "背", "exetype": "help", "truncated": false, "note": "", "restTime": 90, "sets": [
+   {"index": 1, "done": true, "weight": "45.5", "unit": "kg", "reps": "8", "time": 0, "timeLabel": "", "selfWeight": false, "rpe": "", "note": "", "comment": "", "setType": ""},
+   {"index": 2, "done": true, "weight": "", "unit": "kg", "reps": "6", "time": 90, "timeLabel": "", "selfWeight": false, "rpe": "", "note": "", "comment": "", "setType": ""}]},
+  {"index": 6, "name": "Walking", "type": "", "exetype": "cardio", "truncated": false, "note": "", "sets": [
+   {"index": 1, "done": true, "weight": "", "unit": "", "reps": "", "time": 1800, "timeLabel": "", "selfWeight": false, "rpe": "", "note": "", "comment": "", "setType": "",
+    "metrics": {"distance": "2.0", "calories": "90", "workoutTime": "1800.5", "avgHeartRate": "100", "maxHeartRate": "120", "minHeartRate": "80"}}]}
+ ]
+}

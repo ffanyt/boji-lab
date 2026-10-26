@@ -1,0 +1,42 @@
+[Unit]
+Description=薄肌研究所 (lianshiji) fitness log
+After=network.target
+
+[Service]
+Type=simple
+User=lianshiji
+Group=lianshiji
+# Time zone for dates and sleep times. Change both to your zone; values in the EnvironmentFile win over these.
+Environment=TZ=Asia/Shanghai LSJ_TZ=Asia/Shanghai
+EnvironmentFile=/etc/lianshiji.env
+ExecStart=/usr/bin/python3 /opt/lianshiji/server.py
+Restart=always
+RestartSec=3
+MemoryMax=256M
+UMask=0077
+
+# Sandbox. The app only listens on 127.0.0.1 behind the reverse proxy and writes nothing outside its data directory.
+# Its only outbound connection is the optional 训记 web sync (HTTPS to trains.xunjiapp.cn, when a user taps 「从训记同步」).
+NoNewPrivileges=true
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=yes
+ReadWritePaths=/var/lib/lianshiji
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+# No outbound network at all. Using the 训记 web sync? Delete these two lines (训记's addresses aren't fixed).
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

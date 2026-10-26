@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>你的数据怎么处理 · 薄肌研究所</title>
+<meta name="theme-color" content="#FFF6D9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A0A0B" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="薄肌研究所">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<!-- login.js only sets the look (data-style / data-theme from localStorage) before the first paint; no forms here -->
+<script src="/login.js"></script>
+<style>
+/* Self-contained (no app.css): 正经 and 抽象 (data-style="abstract", the default), light and dark, like login.html. */
+:root{color-scheme:light;--bg:#F1F3F5;--surface:#FFFFFF;--ink:#121820;--muted:#5A6573;--line:#D8DEE5;--accent:#1D4ED8;--accent-soft:#E2E9FB;
+  --sec-bg:transparent;--sec-bd:transparent;--sec-shadow:none;--sec-pad:0;--sum-bg:var(--accent-soft);--sum-ink:var(--ink);--sum-bd:transparent;--sum-shadow:none;--dots:transparent;--hl:transparent}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0E1217;--surface:#161B22;--ink:#E6EAF0;--muted:#8D98A7;--line:#2A323D;--accent:#6A93FF;--accent-soft:#1D2A4A}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0E1217;--surface:#161B22;--ink:#E6EAF0;--muted:#8D98A7;--line:#2A323D;--accent:#6A93FF;--accent-soft:#1D2A4A}
+html[data-style="abstract"]{color-scheme:light;--bg:#FFF6D9;--dots:rgba(17,17,17,.075);--surface:#FFFFFF;--ink:#111111;--muted:#55514A;--line:#DCD2B6;--accent:#7B2FF7;--accent-soft:#F0E6FF;--hl:#FFE14D;
+  --sec-bg:#FFFFFF;--sec-bd:#111111;--sec-shadow:4px 4px 0 #111111;--sec-pad:14px 16px 16px;--sum-bg:#C3FF3A;--sum-ink:#111111;--sum-bd:#111111;--sum-shadow:4px 4px 0 #111111}
+@media (prefers-color-scheme: dark){html[data-style="abstract"]:not([data-theme="light"]){color-scheme:dark;--bg:#0A0A0B;--dots:rgba(255,255,255,.07);--surface:#1B1B1E;--ink:#F7F5EE;--muted:#ABA79E;--line:#3A3A40;--accent:#B58CFF;--accent-soft:#2D1F4D;--hl:#5B2BC4;
+  --sec-bg:#1B1B1E;--sec-bd:#EDEBE4;--sec-shadow:4px 4px 0 #9B6BFF;--sum-bg:#1D240C;--sum-ink:#F7F5EE;--sum-bd:#C3FF3A;--sum-shadow:4px 4px 0 #C3FF3A}}
+html[data-style="abstract"][data-theme="dark"]{color-scheme:dark;--bg:#0A0A0B;--dots:rgba(255,255,255,.07);--surface:#1B1B1E;--ink:#F7F5EE;--muted:#ABA79E;--line:#3A3A40;--accent:#B58CFF;--accent-soft:#2D1F4D;--hl:#5B2BC4;
+  --sec-bg:#1B1B1E;--sec-bd:#EDEBE4;--sec-shadow:4px 4px 0 #9B6BFF;--sum-bg:#1D240C;--sum-ink:#F7F5EE;--sum-bd:#C3FF3A;--sum-shadow:4px 4px 0 #C3FF3A}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background-color:var(--bg);background-image:radial-gradient(var(--dots) 1.2px,transparent 1.7px);background-size:18px 18px;color:var(--ink);
+  font:16px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:max(20px,env(safe-area-inset-top)) 16px max(40px,env(safe-area-inset-bottom))}
+.top{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;margin-bottom:18px}
+.top a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:8px;min-height:44px}
+.mark{width:28px;height:28px;flex:none;display:block}
+h1{font-size:26px;line-height:1.3;margin:0 0 14px}
+h2{font-size:18px;line-height:1.4;margin:0 0 6px}
+p{margin:0 0 8px}
+ul{margin:0;padding-left:1.2em}
+li{margin:4px 0}
+li::marker{color:var(--muted)}
+strong{font-weight:700}
+a{color:var(--accent);font-weight:600;text-underline-offset:3px}
+.sum{background:var(--sum-bg);color:var(--sum-ink);border:2px solid var(--sum-bd);box-shadow:var(--sum-shadow);border-radius:14px;padding:14px 16px;margin-bottom:22px}
+.sum ul{padding-left:1.1em}
+section{background:var(--sec-bg);border:2px solid var(--sec-bd);box-shadow:var(--sec-shadow);border-radius:14px;padding:var(--sec-pad);margin-bottom:22px}
+.muted{color:var(--muted);font-size:14px}
+footer{margin-top:28px;color:var(--muted);font-size:14px}
+footer a{display:inline-block;min-height:44px;line-height:44px}
+/* 抽象风: heavy titles, a highlighter under the big one, sticker cards */
+html[data-style="abstract"] h1{font-weight:800;-webkit-text-stroke:.4px currentColor}
+html[data-style="abstract"] h1 span{padding:0 2px;background:linear-gradient(transparent 58%,var(--hl) 58%,var(--hl) 90%,transparent 90%)}
+html[data-style="abstract"] h2{font-weight:800;-webkit-text-stroke:.3px currentColor}
+html[data-style="abstract"] .sum{rotate:-.6deg}
+html[data-style="abstract"] a{font-weight:800;text-decoration-thickness:2px}
+html[data-style="abstract"] .top{font-weight:800}
+@media (prefers-reduced-motion: reduce){html[data-style="abstract"] .sum{rotate:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a href="/"><img class="mark" src="/icons/favicon.svg" alt="" width="28" height="28">薄肌研究所</a></div>
+
+  <h1><span>你的数据怎么处理</span></h1>
+
+  <div class="sum">
+    <ul>
+      <li>你记的饭、训练、身体数据和照片，存在薄肌研究所这台服务器上。</li>
+      <li>Claude（Anthropic 公司的 AI）在维护者的电脑上看你的记录、给建议；看的时候，你的照片和记录会发给 Anthropic。</li>
+      <li>管理员和维护者能看到所有人的数据。只在你信任他们的时候用。</li>
+    </ul>
+  </div>
+
+  <section>
+    <h2>存在哪</h2>
+    <ul>
+      <li>你的记录（饮食、训练、睡眠、体重、喝水、计划、日报……）存在这台服务器的数据库里，照片存在同一台服务器的硬盘上。</li>
+      <li>数据没有加密存储。</li>
+      <li>别的用户看不到你的记录和照片。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>谁来分析</h2>
+    <ul>
+      <li>服务器本身不调用任何 AI。分析在维护者的电脑上做：那里的 Claude Code（Anthropic 的 AI 工具）定时处理，通常一天两次，看你新记的东西，估热量、点评训练、写日报、做计划，再把结果写回服务器。</li>
+      <li><strong>处理时，你的照片和记录会发给 Anthropic 的模型。</strong>Anthropic 怎么对待这些数据，见它的<a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer" target="_blank">隐私政策</a>。</li>
+      <li>新账号在新手引导里点「我知道了」之前，Claude 不看你的照片，只处理文字和数字。</li>
+      <li>你在 Claude 页留的话、记录里写的备注，Claude 都会读到。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>谁能看到你的数据</h2>
+    <ul>
+      <li><strong>别的用户</strong>：看不到。</li>
+      <li><strong>管理员</strong>：网页上看不到你的记录。但管理员能重置你的密码，再用新密码登进你的账号，所以这挡不住管理员。</li>
+      <li><strong>维护者</strong>（运行 Claude 的人）：手里有一个令牌，能读写所有人的记录和照片。</li>
+      <li><strong>能登录这台服务器的人</strong>（root）：能看到一切，包括数据库、照片和备份。</li>
+      <li>管理员和维护者通常是同一个人，就是邀请你的那位或他信任的人。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>可选的连接（不开就没有）</h2>
+    <ul>
+      <li><strong>训记</strong>：你在「我的 → 训记」存了训记 key，服务器才会在你点「从训记同步」「写进训记」时去连训记。key 存在服务器数据库里（没有加密），不会发回网页，不进日志和导出，注销时一起删掉。往训记里写东西前，一定先给你看要写什么，你点了才写。导入的训练和其他记录一样，Claude 处理时也会发给 Anthropic。</li>
+      <li><strong>Apple 健康</strong>：你自己在「我的 → Apple 健康同步」生成一个上传令牌，放进「同步健康」快捷指令。这个令牌只能上传睡眠、体重、体脂率、步数、活动能量、静息心率和 HRV，读不到任何东西；服务器只存它的指纹（哈希）。不用了随时可以撤销。快捷指令每次还会传最近两天的心率和活动能量明细（带每条来自哪台设备，比如手机还是手表）：服务器只用它算你在「训练中」记的每次训练的平均、最高、最低心率和消耗，存下这几个数，原始明细和设备名都不存。</li>
+      <li><strong>通知</strong>：开了通知后，苹果、谷歌这些推送服务只收到一条空的“醒一下”，具体内容是你的手机自己从薄肌研究所取的，推送服务看不到。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>导出和注销</h2>
+    <ul>
+      <li><strong>导出</strong>：「我的 → 账号 → 导出我的数据」，下载一个文件，里面是你的全部记录（不含照片）。</li>
+      <li><strong>注销</strong>：「我的 → 账号 → 注销账号」，输入密码确认。马上删除你的账号、全部记录、照片、上传令牌、训记 key 和通知订阅，删了不能恢复。最后一个管理员不能注销自己。</li>
+      <li>注销后，下面说的旧备份里还会留一份，到期自动删掉。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>备份</h2>
+    <ul>
+      <li>数据库每天备份一次，保留 14 天；照片每周打包一次，保留最近 4 份（大约一个月）。</li>
+      <li>备份放在同一台服务器上，同样没有加密。</li>
+    </ul>
+    <p class="muted">这是薄肌研究所的默认设置；维护者如果改过，以他说的为准。</p>
+  </section>
+
+  <section>
+    <h2>另外</h2>
+    <ul>
+      <li>照片估的热量是估算，所有建议都不是医疗建议。身体不舒服先看医生。</li>
+      <li>有问题直接问邀请你的人。</li>
+    </ul>
+  </section>
+
+  <footer><a href="/">← 回到薄肌研究所</a></footer>
+</div>
+</body>
+</html>
