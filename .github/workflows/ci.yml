@@ -8,14 +8,15 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # official images, so the old 3.9 doesn't depend on setup-python having a build for the current runner
+    container: python:${{ matrix.python }}-slim
     strategy:
+      fail-fast: false
       matrix:
         python: ["3.9", "3.12"]   # 3.9 = macOS system python3 (bin/lsj, bin/xunji); 3.12 = a current server
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065   # v5
-        with:
-          python-version: ${{ matrix.python }}
+      - run: pip install -q tzdata   # zoneinfo falls back to it when the image has no system tz data
       - run: python -m unittest discover -s tests -v
 
   lint:
