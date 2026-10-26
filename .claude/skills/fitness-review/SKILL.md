@@ -281,6 +281,7 @@ description: 以用户私人教练的身份批量处理「薄肌研究所」：�
 
 生效时，上面的步骤照做，但有这些限制：
 - 无人值守：不提问，不等确认。只处理参数里的那一个账号；没给用户名就停，最后一行写 `FAIL 没有指定账号`
+- 文件：batch 文件写进项目目录里的 `scratchpad/`（`scratchpad/<用户名>-<时间>.json`）。定时运行只能写这个目录、只能读项目里的文件和 `~/.cache/lianshiji/`（`bin/lsj photos` 下载的照片在那里），别的路径会被拒
 - 所有 `bin/lsj` 命令都在环境变量 `LSJ_DENY_COLLECTIONS=plan,plan_history,profile` 下运行（定时脚本已经设好；写这些集合会被拒，退出码 1；真遇到了说明这次运行越界了，停下，最后一行写 `FAIL 想改计划`）。例外：账号还**没有计划**（`pending` 里 `plan` 是空的，通常是刚用邀请码注册的新朋友）而资料已经填了，或者计划是他自己从模版搭的、还没有饮食目标（`plan.template` 有、`diet.kcal` 没有），定时脚本这次不禁止写，你按 `/fitness-plan` 直接做第一份计划（写 `plan/current`、计划说明，把 `profile.needsReview` 改成 false；自己搭的只补 `diet`，训练日不动），同一次运行里也照常处理他的记录
 - 训记：照常 `bin/xunji sync -u <用户名>`，不加 `--allow-deletes`；有 `heldBack` 或同步失败就记进 `note`，继续
 - 要做的：待处理的记录（餐、训练、睡眠截图）；要写或要重写的日报（第 1 步的日期，含 `reportStale` 的）；`meta/insights`；第 1.5 步（交代的事、拍板结果、记得的事）；到期的周报；`log`

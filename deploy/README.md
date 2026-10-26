@@ -179,4 +179,4 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.lianshiji.auto-revie
 scripts/auto-review.sh            # 先手动跑一次看看（日志在 ~/Library/Logs/lianshiji/auto-<日期>.log）
 ```
 
-`scripts/auto-review.sh` 对每个启用的账号先查有没有要做的，有才启动 `claude -p "/fitness-review auto <用户名>"`；无人值守运行只开 `bin/lsj`、`bin/xunji` 和读写文件的权限，计划、资料一律写不了（改动都做成提案，等用户在网页上同意）。Mac 睡着时错过的那次会在唤醒后补跑，关机时错过的就跳过。会用到这台电脑上 Claude Code 登录的账号额度。停用：`launchctl bootout gui/$(id -u)/com.lianshiji.auto-review`。
+`scripts/auto-review.sh` 对每个启用的账号先查有没有要做的，有才启动 `claude -p "/fitness-review auto <用户名>"`；无人值守运行只开 `bin/lsj`、`bin/xunji` 的权限，文件只能读项目目录和照片缓存 `~/.cache/lianshiji/`、只能写项目里的 `scratchpad/`（留言里就算藏了指令，也读不到这台电脑上的密钥、改不了别的文件），计划、资料一律写不了（改动都做成提案，等用户在网页上同意）。Mac 睡着时错过的那次会在唤醒后补跑，关机时错过的就跳过。会用到这台电脑上 Claude Code 登录的账号额度。停用：`launchctl bootout gui/$(id -u)/com.lianshiji.auto-review`。

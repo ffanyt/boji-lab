@@ -122,10 +122,13 @@ for U in $USERS; do
     echo "$U: running ($WHY)"
     # A new account (no plan yet) gets its first plan in this run, so plan and profile stay writable; otherwise no plan writes.
     case "$WHY" in *"first plan"*) DENY="" ;; *) DENY=plan,plan_history,profile ;; esac
+    # Files: it reads the project (allowed by default) and the photos bin/lsj downloads, and writes only its batch files
+    # in scratchpad/. A note that tries to steer the run can't read keys or edit anything else on this Mac.
+    mkdir -p scratchpad
     OUT=$(LSJ_DENY_COLLECTIONS=$DENY "$CLAUDE" -p "/fitness-review auto $U" \
       --permission-mode dontAsk --no-session-persistence \
       --allowedTools "Bash(bin/lsj *)" "Bash(bin/xunji *)" "Bash(date *)" "Bash(date)" "Bash(ls *)" "Bash(mkdir *)" \
-                     "Read" "Glob" "Grep" "Write" "Edit" 2>&1)
+                     "Read(~/.cache/lianshiji/**)" "Edit(./scratchpad/**)" 2>&1)
     RC=$?
     printf '%s\n' "$OUT" | tail -40
     case "$OUT" in *"Failed to authenticate"*)

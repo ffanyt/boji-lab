@@ -126,7 +126,7 @@
 - `app/xunji_import.py`：训记训练转成薄肌研究所记录的规则和读训记的请求，服务器（网页同步）和 `bin/xunji` 共用，部署时和 `server.py` 放在一起
 - `app/web/`：手机网页（`index.html` + `app.js` + `app.css`，原生 JS，没有构建步骤）；「数据」页在 `stats.js` + `stats.css`，Claude 页（右上角 ✦ 进入的二级页，以及今日页「Claude」块和「我的 → Claude」那一节）在 `claude.js` + `claude.css`（都用 `app.js` 暴露的 `window.LSJ` 里的状态和函数）；`login.html` + `login.js`、图标、manifest、自托管字体（Barlow Condensed，SIL OFL 1.1）
 - `bin/lsj`：Claude 用的命令行客户端；`bin/xunji`：训记桥接（见上）
-- `scripts/auto-review.sh`：定时处理。对每个启用账号先查有没有要做的（待处理记录、留言、拍板结果、过期日报、到期周报），有才运行 `claude -p "/fitness-review auto <用户名>"`（`LSJ_DENY_COLLECTIONS=plan,plan_history,profile`，权限只开 `bin/lsj`、`bin/xunji` 和读写文件），并把下次运行时间写进 `meta/status.auto`。用 launchd 定时（模板 `deploy/auto-review.plist.example`），日志在 `~/Library/Logs/lianshiji/`
+- `scripts/auto-review.sh`：定时处理。对每个启用账号先查有没有要做的（待处理记录、留言、拍板结果、过期日报、到期周报），有才运行 `claude -p "/fitness-review auto <用户名>"`（`LSJ_DENY_COLLECTIONS=plan,plan_history,profile`，权限只开 `bin/lsj`、`bin/xunji`，读项目里的文件和照片缓存 `~/.cache/lianshiji/`，只能写项目里的 `scratchpad/`），并把下次运行时间写进 `meta/status.auto`。用 launchd 定时（模板 `deploy/auto-review.plist.example`），日志在 `~/Library/Logs/lianshiji/`
 - `tests/`：`python3 -m unittest discover -s tests -v`
 - `deploy/`：systemd 服务、`nginx.conf.example`、备份 cron、fail2ban、`deploy.sh`（推送代码并重启，目标读 `deploy/.deploy.env`）、可选的 Docker。部署步骤见 `deploy/README.md`
 - `deploy/make-shortcut.py`：生成并签名「同步健康」快捷指令，输出 `app/web/lianshiji-health.shortcut`（不进仓库），用户登录后从 `/shortcut` 下载（网页「我的 → Apple 健康同步」有按钮）。令牌不在文件里：用户添加后编辑快捷指令，把第一个文本框「把这里换成同步令牌」换成自己的令牌（导入问题的写法在 iPhone 上点「添加快捷指令」会没反应，所以不用）。签名用 macOS 的 `shortcuts sign`（要登录 iCloud）；`--signer` 改用本机的 `deploy/local/signer.py`（不进仓库；它要是把文件发给第三方签名服务，用之前要得到维护者同意）。签完会解开签名文件和本地生成的内容逐项比对，地址等内容被改了就报错。服务器地址或上传格式变了要重新生成再部署，用户要删掉手机上的旧快捷指令、重新下载（加心率和活动能量明细那次就是这样）
