@@ -715,7 +715,7 @@ function exVerdict(e, w) {
   const tg = exTarget(e, w.planDayId), p = prevEx(e.name, w), pw = p ? workOf(p.sets) : null;
   const v = { wk, tg, prev: pw ? { date: p.date, wk: pw, sets: p.sets } : null, up: null, more: null, hit: null, miss: 0 };
   if (pw && !wk.timed && !pw.timed && !wk.mixed && !pw.mixed) {  // a weight missing on some sets: no claim either way
-    // under 1 kg apart counts as the same weight: machine stacks converted from lb come out as 40.8 / 41 kg
+    // under 1 kg apart counts as the same weight: a stack in lb converts to odd kg (50 lb = 22.7, logged as 22.7 or 23)
     const same = wk.load != null && pw.load != null && Math.abs(wk.load - pw.load) < 1;
     if (wk.load != null && pw.load != null && !same && wk.load > pw.load) v.up = Math.round((wk.load - pw.load) * 100) / 100;
     else if (same) {
@@ -762,14 +762,14 @@ function exRx(x, d, low, o = {}) {
 }
 // The weight step of an exercise: what −/+ move by, what the rule adds or takes off, and what Claude's advice snaps
 // to. The plan's `step` for it (on this plan day, else on another), else the smallest difference between the distinct working weights it was done with
-// (≥ 1, ≤ 10, to 0.5, at least two weights: this person's dumbbells go by 1 kg, the lat pulldown stack by 6.8), else by
+// (≥ 1, ≤ 10, to 0.5, at least two weights: some gyms' dumbbells go by 1 kg, a stack in lb by about 6.8), else by
 // the equipment in its name: a barbell 2.5 (legs 5), dumbbells / kettlebells / one-sided moves 2, machines and cables 5.
 function stepOf(name, dayId) {
   const key = String(name || '').trim(); if (!key) return 2.5;
   const px = planEx(key, dayId); if (px && isNum(px.step) && px.step > 0) return px.step;
   // the same move on another plan day with its step set (侧平举 on two days, the same dumbbells)
   for (const d of planDays()) { const e = (d.exercises || []).find(e => e && String(e.name || '').trim() === key && isNum(e.step) && e.step > 0); if (e) return e.step; }
-  // a barbell goes by plates, never by the history (训记 has 40 / 41 kg entries that would make it 1 kg)
+  // a barbell goes by plates, never by the history (a 40 and a 41 kg entry would make it 1 kg)
   if (/杠铃/.test(key)) return exPart(key) === '腿' ? 5 : 2.5;
   const h = stepHist(key); if (h != null) return h;
   if (/哑铃|壶铃|单手|单腿|单臂|保加利亚|箭步/.test(key)) return 2;
@@ -3810,8 +3810,8 @@ function blankSet(kind, o = {}) {
     : kind === 'sec' ? { kg: null, sec: null } : { kg: null, reps: null };
   return { ...s, done: false, ...o };
 }
-// The numbers of a set row: [field, label, step, whole numbers]. Weights go up 2.5 kg (dumbbell racks and machine stacks
-// alike in this gym), reps 1, seconds 5.
+// The numbers of a set row: [field, label, step, whole numbers]. Weights go up 2.5 kg unless the move has its own step
+// (stepOf), reps 1, seconds 5.
 function setFields(kind, step = 2.5) {
   if (kind === 'sec') return [['sec', '秒', 5, true]];
   if (kind === 'assist') return [['assist', '助力 kg', step, false], ['reps', '次数', 1, true]];

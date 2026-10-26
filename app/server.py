@@ -1351,7 +1351,7 @@ def workout_updates(c, uid, samples, now=None):
 
 
 def workout_line(d, start):
-    """「训练心率：10/16 胸 肩 三头 均 126 · 最高 158 · 消耗 290 kcal」 (or 「训练消耗：10/16 … 290 kcal」) for the
+    """「训练心率：3/02 背 二头 均 131 · 最高 162 · 消耗 240 kcal」 (or 「训练消耗：3/02 … 240 kcal」) for the
     notification; None with neither. An older title 「A · 胸 肩 三头」 loses its plan-day id, as on the page."""
     hr, kcal = d.get('heartRate'), d.get('kcal')
     day = d.get('date') if isinstance(d.get('date'), str) and re.fullmatch(r'\d{4}-\d{2}-\d{2}', d['date']) else start.date().isoformat()
